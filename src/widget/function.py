@@ -40,9 +40,8 @@ def get_system_font():
     return font_name
 
 DEFAULT_FONT = get_system_font()
-text_size = 12
 
-def draw_text(cr, x, y, text, color_alpha):
+def draw_text(cr, x, y, text, color_alpha, text_size = 12):
     context = pangocairo.CairoContext(cr)
     layout = context.create_layout()
     layout.set_font_description(pango.FontDescription("%s %s" % (DEFAULT_FONT, text_size)))

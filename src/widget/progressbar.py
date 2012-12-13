@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import gtk
-from function import draw_pixbuf
+from function import draw_pixbuf, draw_text
 
 class ProgressBar(gtk.Button):
     def __init__(self, 
@@ -60,10 +60,14 @@ class ProgressBar(gtk.Button):
         #
         draw_pixbuf(cr, frame_pixbuf, rect.x, rect.y)
         if self.value > 0:
-            fg_pixbuf = self.fg_pixbuf.scale_simple(self.value * self.fg_w / 100, 
+            fg_pixbuf = self.fg_pixbuf.scale_simple(int(self.value * self.fg_w / 100), 
                                                 self.fg_h,
                                                 gtk.gdk.INTERP_BILINEAR)
             draw_pixbuf(cr, fg_pixbuf, rect.x + 4, rect.y + 3)
+        # text show.    
+        color = ("#FFFFFF", 0.5)
+        font_size =  9
+        draw_text(cr, rect.x + self.pb_w/2, rect.y + self.pb_h/2 - 1, str(self.value) + "%", color, font_size)
         return True
     
 if __name__ == "__main__":    
@@ -79,7 +83,7 @@ if __name__ == "__main__":
     fixed.add_events(gtk.gdk.ALL_EVENTS_MASK)
     fixed.connect("expose-event", win_expose_event)
     fixed.put(ProgressBar(120), 20, 50)
-    fixed.put(ProgressBar(80), 20, 90)
+    fixed.put(ProgressBar(80.5), 20, 90)
     fixed.put(ProgressBar(40), 20, 130)
     win.add(fixed)
     win.show_all()
