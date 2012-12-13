@@ -108,7 +108,11 @@ class InfoBtn(gtk.Button):
         self.add_events(gtk.gdk.ALL_EVENTS_MASK)
         self.connect("button-press-event", self.infobtn_press_event)
         self.connect("motion-notify-event", self.infobtn_motion_notify_event)
+        self.connect("leave-notify-event", self.infobtn_leave_notify_event)
         self.connect("expose-event", self.infobtn_expose_event)
+        
+    def infobtn_leave_notify_event(self, widget, event):    
+        self.big_index = -1
         
     def infobtn_press_event(self, widget, event):
         w_padding = 180
@@ -151,19 +155,20 @@ class InfoBtn(gtk.Button):
                 text = text.decode('utf-8')
                 text = text[:4] + "..." + text[-4:]
             draw_text(cr, x + w_padding/2, y + h_padding/2, text, ("#FFFFFF", 1))
-        # big rectangle.    
-        cr.set_source_rgb(*color_hex_to_cairo(info_9_list[self.big_index][2]))    
-        cr.rectangle(info_9_list[self.big_index][0] - 10, 
-                     info_9_list[self.big_index][1] - 10,
-                     w_padding + 20, h_padding + 20)            
-        cr.fill()
-        big_text = info_9_list[self.big_index][3].decode("utf-8")
-        if len(big_text) > 7:
-            big_text = big_text[:4] + "..." + big_text[-4:]
-        draw_text(cr, 
-                  info_9_list[self.big_index][0] + w_padding/2, 
-                  info_9_list[self.big_index][1] + h_padding/2, 
-                  big_text, ("#FFFFFF", 1))        
+        if self.big_index != -1:    
+            # big rectangle.    
+            cr.set_source_rgb(*color_hex_to_cairo(info_9_list[self.big_index][2]))    
+            cr.rectangle(info_9_list[self.big_index][0] - 10, 
+                         info_9_list[self.big_index][1] - 10,
+                         w_padding + 20, h_padding + 20)            
+            cr.fill()
+            big_text = info_9_list[self.big_index][3].decode("utf-8")
+            if len(big_text) > 7:
+                big_text = big_text[:4] + "..." + big_text[-4:]
+            draw_text(cr, 
+                      info_9_list[self.big_index][0] + w_padding/2, 
+                      info_9_list[self.big_index][1] + h_padding/2, 
+                      big_text, ("#FFFFFF", 1))        
         return True
 
 

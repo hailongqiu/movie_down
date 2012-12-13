@@ -24,6 +24,7 @@ import gtk
 import gobject
 
 from function import draw_text
+from sound.sound import sound_play
 
 class Navigation(gtk.HBox):
     __gsignals__ = {
@@ -49,6 +50,9 @@ class Navigation(gtk.HBox):
         self.connect("expose-event", self.navigation_expose_event)
         
     def temp_nav_title_clicked(self, widget, widget_index, title):    
+        # 播放音效.
+        sound_play.play("widget/theme/sound/clicked.wav")
+        # 发送信号.
         self.emit("select-index-event", widget_index, title)
         
     def navigation_expose_event(self, widget, event):
