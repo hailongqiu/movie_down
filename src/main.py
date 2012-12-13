@@ -30,7 +30,7 @@ if __name__ == "__main__":
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
     win.set_title("qvod搜索下载器")
     win.connect("destroy", lambda w : gtk.main_quit())
-    win.set_size_request(980, 500)
+    win.set_size_request(1200, 800)
     qvod_scan_widget = QvodScanWidget()
     
     win.add(qvod_scan_widget)

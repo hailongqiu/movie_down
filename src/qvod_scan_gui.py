@@ -25,13 +25,13 @@ import gtk
 from widget.navigation import Navigation
 from widget.searchbar import SearchBar
 from widget.searchinfo import SearchInfo
-
+from widget.function import draw_pixbuf
 from qvod_scan import QvodScan
 
 FORM_WIDTH, FORM_HEIGHT = 800, 500
 
 class QvodScanWidget(gtk.ScrolledWindow): 
-    def __init__(self):
+    def __init__(self, pixbuf_file="widget/theme/background/wall.jpg"):
         gtk.ScrolledWindow.__init__(self)
         # init value.
         self.qvod = QvodScan()   
@@ -48,12 +48,19 @@ class QvodScanWidget(gtk.ScrolledWindow):
         self.main_vbox.pack_start(self.search_info_ali, False, False)
         self.main_vbox.connect("expose-event", self.searchbar_expose_event)
         
+        self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(pixbuf_file)
+        
     def searchbar_expose_event(self, widget, event):    
         cr = widget.window.cairo_create()
         rect = widget.allocation
-        cr.set_source_rgb(1, 1, 1)
-        cr.rectangle(rect.x, rect.y, rect.width, rect.height)
-        cr.fill()
+        try:
+            pixbuf = self.bg_pixbuf.scale_simple(rect.width, rect.height, gtk.gdk.INTERP_BILINEAR)
+            draw_pixbuf(cr, pixbuf, rect.x, rect.y)
+        except Exception, e:    
+            print "图片加载错误!!", e
+            cr.set_source_rgb(1, 1, 1)
+            cr.rectangle(rect.x, rect.y, rect.width, rect.height)
+            cr.fill()
 
     def init_navigation(self):    
         self.nav_igation = Navigation(["首页", "动作片", "纪录片", "喜剧片",
