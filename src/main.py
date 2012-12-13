@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2012 Deepin, Inc.
-#               2012 Hailong Qiu
+# Copyright (C) 2012 爱搜影, Inc.
+#               2012 暴风
 #
-# Author:     Hailong Qiu <356752238@qq.com>
-# Maintainer: Hailong Qiu <356752238@qq.com>
+# Author:     暴风         <qw85525006@sina.com>
+# Maintainer: 暴风,五彩书生  
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,10 +28,11 @@ if __name__ == "__main__":
         print index
         
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    win.set_position(gtk.WIN_POS_CENTER)
     win.set_title("qvod搜索下载器")
     win.connect("destroy", lambda w : gtk.main_quit())
-    win.set_size_request(1200, 800)
-    qvod_scan_widget = QvodScanWidget()
+    win.set_size_request(1300, 600)
+    qvod_scan_widget = QvodScanWidget(None)
     
     win.add(qvod_scan_widget)
     win.show_all()

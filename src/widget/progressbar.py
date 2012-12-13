@@ -19,15 +19,3 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
-    ==================================
-    用户搜索->> 网络(搜索到信息保存到数据库，免得下次继续重复搜索)
-           ->> 本地(数据库, 可读文本) sqlite.
-    ==================================
-    用户下载->> 暂停，继续，停止。
-           ->> 下载进度，KB/S，下载限制。
-    ==================================
-    将搜索数据库放在用户的/home/***/.config/deepin_meida_player/
-    ==================================
-    

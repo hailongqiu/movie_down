@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2012 Deepin, Inc.
-#               2012 Hailong Qiu
+# Copyright (C) 2012 爱搜影, Inc.
+#               2012 暴风
 #
-# Author:     Hailong Qiu <356752238@qq.com>
-# Maintainer: Hailong Qiu <356752238@qq.com>
+# Author:     暴风         <qw85525006@sina.com>
+# Maintainer: 暴风,五彩书生  
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ class Navigation(gtk.HBox):
         
     def temp_nav_title_clicked(self, widget, widget_index, title):    
         # 播放音效.
-        sound_play.play("widget/theme/sound/clicked.wav")
+        sound_play.play("widget/theme/sound/clicked_nav.ogg")
         # 发送信号.
         self.emit("select-index-event", widget_index, title)
         

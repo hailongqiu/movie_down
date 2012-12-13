@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2012 Deepin, Inc.
-#               2012 Hailong Qiu
+# Copyright (C) 2012 爱搜影, Inc.
+#               2012 暴风
 #
-# Author:     Hailong Qiu <356752238@qq.com>
-# Maintainer: Hailong Qiu <356752238@qq.com>
+# Author:     暴风         <qw85525006@sina.com>
+# Maintainer: 暴风,五彩书生  
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,8 +47,8 @@ class QvodScanWidget(gtk.ScrolledWindow):
         self.main_vbox.pack_start(self.search_bar_ali, False, False)
         self.main_vbox.pack_start(self.search_info_ali, False, False)
         self.main_vbox.connect("expose-event", self.searchbar_expose_event)
-        
-        self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(pixbuf_file)
+        if pixbuf_file:
+            self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(pixbuf_file)
         
     def searchbar_expose_event(self, widget, event):    
         cr = widget.window.cairo_create()
@@ -57,7 +57,7 @@ class QvodScanWidget(gtk.ScrolledWindow):
             pixbuf = self.bg_pixbuf.scale_simple(rect.width, rect.height, gtk.gdk.INTERP_BILINEAR)
             draw_pixbuf(cr, pixbuf, rect.x, rect.y)
         except Exception, e:    
-            print "图片加载错误!!", e
+            # print "图片加载错误!!", e
             cr.set_source_rgb(1, 1, 1)
             cr.rectangle(rect.x, rect.y, rect.width, rect.height)
             cr.fill()
