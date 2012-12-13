@@ -35,6 +35,8 @@ class QvodScanWidget(gtk.ScrolledWindow):
         gtk.ScrolledWindow.__init__(self)
         # init value.
         self.qvod = QvodScan()   
+        if pixbuf_file:
+            self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(pixbuf_file)
         # 
         self.init_navigation()
         self.init_search_bar()
@@ -47,8 +49,6 @@ class QvodScanWidget(gtk.ScrolledWindow):
         self.main_vbox.pack_start(self.search_bar_ali, False, False)
         self.main_vbox.pack_start(self.search_info_ali, False, False)
         self.main_vbox.connect("expose-event", self.searchbar_expose_event)
-        if pixbuf_file:
-            self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(pixbuf_file)
         
     def searchbar_expose_event(self, widget, event):    
         cr = widget.window.cairo_create()
@@ -69,9 +69,16 @@ class QvodScanWidget(gtk.ScrolledWindow):
                                        "欧美剧", "日韩剧", "音乐", "QMV高清"])
         self.nav_igation.connect("select-index-event", self.navigation_selece_index_event)
         
-    def init_search_bar(self):    
+    def init_search_bar(self):            
         self.search_bar_ali = gtk.Alignment()
-        self.search_bar = SearchBar()
+        #
+        try:
+            self.bg_pixbuf
+            has_frame = False
+        except:    
+            has_frame = True
+        #
+        self.search_bar = SearchBar(has_frame)
         self.search_bar_ali.add(self.search_bar)        
         self.search_bar_ali.set(0.9, 0, 0.418, 0)
         self.search_bar_ali.set_padding(10, 10, 0, 0)

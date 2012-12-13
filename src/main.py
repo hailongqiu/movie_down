@@ -33,6 +33,7 @@ if __name__ == "__main__":
     win.connect("destroy", lambda w : gtk.main_quit())
     win.set_size_request(1300, 600)
     qvod_scan_widget = QvodScanWidget(None)
+    # qvod_scan_widget = QvodScanWidget()
     
     win.add(qvod_scan_widget)
     win.show_all()

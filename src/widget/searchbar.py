@@ -47,14 +47,14 @@ HOME_KEY = 65360
 F1, F2, F3, F4, F5, F6, F7,F8, F9, F10, F11, F12 = (65470, 65471, 65472, 65473, 65474, 65475, 65476, 65477, 65478, 65479, 65480, 65481)
 
 class SearchBar(gtk.HBox):
-    def __init__(self):
+    def __init__(self, has_frame=True):
         gtk.HBox.__init__(self)
         #
         self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file("widget/theme/search/searchframe.png")
         #
         self.search_text = gtk.Entry()
         self.search_text.connect("key-press-event", self.search_text_key_sound)
-        # self.search_text.set_has_frame(False)
+        self.search_text.set_has_frame(has_frame)
         self.search_text.set_size_request(420, self.search_text.get_size_request()[1])
         self.search_btn_ali = gtk.Alignment()
         self.search_btn  = SearchBtn()
