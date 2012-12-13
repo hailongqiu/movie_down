@@ -22,6 +22,7 @@
 
 import gtk
 from function import draw_pixbuf
+from sound.sound import sound_play
 
 class SearchBar(gtk.HBox):
     def __init__(self):
@@ -30,6 +31,7 @@ class SearchBar(gtk.HBox):
         self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file("widget/theme/search/searchframe.png")
         #
         self.search_text = gtk.Entry()
+        self.search_text.connect("key-press-event", self.search_text_key_sound)
         # self.search_text.set_has_frame(False)
         self.search_text.set_size_request(420, self.search_text.get_size_request()[1])
         self.search_btn_ali = gtk.Alignment()
@@ -39,6 +41,9 @@ class SearchBar(gtk.HBox):
         self.pack_start(self.search_text, False, False)
         self.pack_start(self.search_btn_ali, False, False)
     
+    def search_text_key_sound(self, widget, event):    
+        sound_play.play("widget/theme/sound/type.wav")
+        
 class SearchBtn(gtk.Button):
     def __init__(self):
         gtk.Button.__init__(self)
