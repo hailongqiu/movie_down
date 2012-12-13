@@ -24,7 +24,6 @@ import gtk
 from function import draw_pixbuf
 from sound.sound import sound_play
 
-PAUSE_KEY = 32
 BACK_SPACE_KEY = 65288
 TAB_KEY = 65289
 CAPS_LOCK_KEY = 65509
@@ -66,7 +65,7 @@ class SearchBar(gtk.HBox):
     
     def search_text_key_sound(self, widget, event):    
         print event.keyval
-        if event.keyval not in [PAUSE_KEY, BACK_SPACE_KEY, TAB_KEY, CAPS_LOCK_KEY, SHIFT_LEFT_KEY, SHIFT_RIGHT_KEY,
+        if event.keyval not in [BACK_SPACE_KEY, TAB_KEY, CAPS_LOCK_KEY, SHIFT_LEFT_KEY, SHIFT_RIGHT_KEY,
                                 CTRL_LEFT_KEY, CTRL_RIGHT_KEY, ALT_LEFT_KEY, ALT_RIGHT_KEY, ENTER_KEY,
                                 LEFT_KEY, RIGHT_KEY, UP_KEY, DOWN_KEY, HOME_KEY,
                                 PAUP_KEY, PADN_KEY,
