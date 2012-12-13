@@ -23,11 +23,16 @@
 import gtk
 from function import draw_pixbuf
 from function import color_hex_to_cairo, draw_text, alpha_color_hex_to_cairo
+from sound.sound import sound_play
 import gobject
+
+def play_book_sound(file_1="widget/theme/sound/book_01.wav", file_2="widget/theme/sound/book_02.wav"):
+    sound_play.play(file_1)    
+    sound_play.play(file_2)
 
 class SearchInfo(gtk.HBox):
     def __init__(self):
-        gtk.HBox.__init__(self)
+        gtk.HBox.__init__(self)                
         #
         self.pre_page_btn_ali = gtk.Alignment()
         self.pre_page_btn = PageBtn("widget/theme/info/left.png", "widget/theme/info/press_left.png")        
@@ -59,7 +64,11 @@ class PageBtn(gtk.Button):
         self.set_size_request(self.pixbuf.get_width() + 20,
                               self.pixbuf.get_height() + 20)
         self.connect("expose-event", self.pagebtn_expose_event)
+        self.connect("clicked", self.pagebtn_clicked_sound)
         gtk.timeout_add(500, self.expose_ratate_simple_time)
+        
+    def pagebtn_clicked_sound(self, widget):    
+        play_book_sound()
         
     def expose_ratate_simple_time(self):    
         if self.press_bool:
@@ -82,7 +91,7 @@ class PageBtn(gtk.Button):
             pixbuf = self.pixbuf.scale_simple(self.pixbuf.get_width() + 15, self.pixbuf.get_height() + 15, gtk.gdk.INTERP_BILINEAR)
             temp_y_padding, temp_x_padding = temp_x_padding/4, temp_y_padding/4
         elif widget.state == gtk.STATE_ACTIVE:
-            self.press_bool = True
+            self.press_bool = True            
             pixbuf = self.pixbuf.scale_simple(self.pixbuf.get_width() + 18, self.pixbuf.get_height() + 18, gtk.gdk.INTERP_BILINEAR)
             pixbuf = pixbuf.rotate_simple(self.ratate_simple_num)
             temp_y_padding, temp_x_padding = temp_x_padding/5, temp_y_padding/5
