@@ -22,16 +22,36 @@
 
 from function import draw_text, draw_pixbuf, alpha_color_hex_to_cairo
 import gtk
-
+import gobject
 '''MVC模式'''
 
+class ModeList(gobject.GObject):
+    '''模式'''
+    __gsignals__ = {        
+        "update-data-event":(gobject.SIGNAL_RUN_LAST,
+                             gobject.TYPE_NONE,(gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_STRING,))
+        }    
+    def __init__(self, items=[]):
+        gobject.GObject.__init__(self)
+        self.items = items
+        
+    def modify_data(self, row, column, data):    # row 行 column 列
+        self.items[row][column] = data
+        self.emit("update-data-event", row, column, data)
+        
 class ListView(gtk.ScrolledWindow):
+    '''視圖'''
     def __init__(self, 
+                 mode_list,
                  titles_pixbuf="widget/theme/listview/title.png",
                  bg_pixbuf="widget/theme/listview/bg.png"):
         gtk.ScrolledWindow.__init__(self)        
         frame_pixbuf="theme/progressbar/frame.png"
         fg_pixbuf="theme/progressbar/fg.png"
+        # init mode list.
+        self.mode_list = mode_list
+        self.mode_list.connect("update-data-event", self.mode_list_update_data_event)
+        self.index_sum = len(self.mode_list.items)
         # init values.
         self.text_color = ("#FFFFFF", 1)
         self.font_size = 10
@@ -51,17 +71,29 @@ class ListView(gtk.ScrolledWindow):
         self.fg_w = self.pb_w - 8
         self.fg_h = self.pb_h - 7
         self.value = 50        
+        self.pb_y_padding = 5
         self.frame_pixbuf = gtk.gdk.pixbuf_new_from_file(frame_pixbuf)
         self.fg_pixbuf = gtk.gdk.pixbuf_new_from_file(fg_pixbuf)
+        # init file name values.
+        self.file_y_pdding = 15
+        self.file_name_x_padding = 80
+        # init file size values.
+        self.file_size_x_padding = self.file_name_x_padding + 150
+        # init down state values.
+        self.down_state_x_pdding = 700
         #
         self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(bg_pixbuf)
         self.draw_main_gui = gtk.Button()
-        self.draw_main_gui.set_size_request(1200, 1200)
+        self.draw_main_gui.set_size_request(790, 1200)
         self.draw_main_gui.add_events(gtk.gdk.ALL_EVENTS_MASK)
         self.draw_main_gui.connect("expose-event", self.list_view_expose_event)
         self.draw_main_gui.connect("button-press-event", self.list_view_button_press_event)
         self.draw_main_gui.connect("motion-notify-event", self.list_view_motion_notify_event)
-        self.add_with_viewport(self.draw_main_gui)        
+        self.add_with_viewport(self.draw_main_gui)                
+        
+    def mode_list_update_data_event(self, widget, row, column, data):
+        # 數據修改,更改界面.
+        self.draw_main_gui.queue_draw()
         
     def list_view_motion_notify_event(self, widget, event):    
         self.check_select_darw(event.y)
@@ -71,16 +103,19 @@ class ListView(gtk.ScrolledWindow):
         
     def check_clicked_draw(self, y):    
         index = int(y / self.selectt_height)
-        if index:
+        if index and index <= self.index_sum:
             self.clicked_index = index
-        self.queue_draw()
+            self.queue_draw()
+            # self.emit()
         
     def check_select_darw(self, y):    
         index = int(y / self.selectt_height)
         if index == 0:
             index = 1
-        self.select_index = index
-        self.queue_draw()
+        if index <= self.index_sum:     
+            self.select_index = index
+            self.queue_draw()
+            # self.emit()
     
     def list_view_expose_event(self, widget, event):
         cr = widget.window.cairo_create()
@@ -94,13 +129,39 @@ class ListView(gtk.ScrolledWindow):
         # draw titles.
         self.draw_titles(cr, rect)
         # test widgets.
-        self.draw_progressbar(cr, rect, value=70, x=self.titles_pb_x_pdding, y=self.selectt_height + 5)
-        self.draw_progressbar(cr, rect, value=80, x=self.titles_pb_x_pdding, y=2 * self.selectt_height + 5)
-        self.draw_progressbar(cr, rect, value=60, x=self.titles_pb_x_pdding, y=3 * self.selectt_height + 5)
-        self.draw_progressbar(cr, rect, value=60, x=self.titles_pb_x_pdding, y=4 * self.selectt_height + 5)
-        self.draw_progressbar(cr, rect, value=60, x=self.titles_pb_x_pdding, y=5 * self.selectt_height + 5)
+        mode_index = 1
+        for i in self.mode_list.items:                        
+            self.list_vewi_cellrenderer(cr, rect, i, mode_index)            
+            mode_index += 1
         return True
+
+    def list_vewi_cellrenderer(self, cr, rect, i, mode_index):
+        '''渲染端'''
+        self.draw_file_name(cr, rect, name=i[0], 
+                            x=self.file_name_x_padding, 
+                            y=mode_index *self.selectt_height + self.file_y_pdding)
+        self.draw_file_size(cr, rect, size=i[1], 
+                            x=self.file_size_x_padding, 
+                            y=mode_index *self.selectt_height + self.file_y_pdding)
+        self.draw_progressbar(cr, rect, value=i[2], 
+                              x=self.titles_pb_x_pdding, 
+                              y=mode_index *self.selectt_height + self.pb_y_padding)
+        self.draw_down_state(cr, rect, state=i[3], 
+                             x=self.down_state_x_pdding, 
+                             y=mode_index * self.selectt_height + self.file_y_pdding)
+        
+    def draw_file_name(self, cr, rect, name, x=0, y=0):    
+        name = name.decode("utf-8")
+        if len(name) > 10:
+            name = name[:4] + "..." + name[-5:]
+        draw_text(cr, rect.x + x, rect.y + y, str(name), ("#000000", 1), 10)
+        
+    def draw_file_size(self, cr, rect, size, x=0, y=0):    
+        draw_text(cr, rect.x + x, rect.y + y, str(size), ("#000000", 1), 10)
                 
+    def draw_down_state(self, cr, rect, state, x=0, y=0):    
+        draw_text(cr, rect.x + x, rect.y + y, str(state), ("#000000", 1), 10)
+        
     def draw_background(self, cr, rect):
         bg_pixbuf = self.bg_pixbuf.scale_simple(rect.width, rect.height, gtk.gdk.INTERP_BILINEAR)
         draw_pixbuf(cr, bg_pixbuf, rect.x, rect.y)
@@ -122,6 +183,7 @@ class ListView(gtk.ScrolledWindow):
         cr.fill()
         
     def draw_titles(self, cr, rect):                    
+        '''画litview标题'''
         # draw file name.
         name_pixbuf = self.titles_pixbuf.scale_simple(180, self.selectt_height, gtk.gdk.INTERP_BILINEAR)
         draw_pixbuf(cr, name_pixbuf, rect.x - 10, rect.y)
@@ -133,12 +195,15 @@ class ListView(gtk.ScrolledWindow):
         # draw down progressbar.
         pb_pixbuf = self.titles_pixbuf.scale_simple(380, self.selectt_height, gtk.gdk.INTERP_BILINEAR)
         draw_pixbuf(cr, pb_pixbuf, rect.x + name_pixbuf.get_width() + size_pixbuf.get_width() - 30, rect.y)
-        draw_text(cr, rect.x + name_pixbuf.get_width() + size_pixbuf.get_width() + 45, rect.y + 13, "下载进度", ("#FFFFFF", 1.0), 10)        
+        draw_text(cr, rect.x + name_pixbuf.get_width() + size_pixbuf.get_width() + 155, rect.y + 13, "下载进度", ("#FFFFFF", 1.0), 10)        
         # draw down state.
         state_pixbuf = self.titles_pixbuf.scale_simple(rect.width, self.selectt_height, gtk.gdk.INTERP_BILINEAR)
-        draw_pixbuf(cr, state_pixbuf, rect.x + 500, rect.y)        
+        draw_pixbuf(cr, state_pixbuf, rect.x + 618, rect.y)        
+        draw_text(cr, rect.x + name_pixbuf.get_width() + size_pixbuf.get_width() + 400, rect.y + 13, "状态", ("#FFFFFF", 1.0), 10) 
+        
         
     def draw_progressbar(self, cr, rect, value, x=0, y=0):
+        '''画进度条'''
         frame_pixbuf = self.frame_pixbuf.scale_simple(self.pb_w, self.pb_h, 
                                                       gtk.gdk.INTERP_BILINEAR)
         draw_pixbuf(cr, frame_pixbuf, rect.x + x, rect.y + y)
@@ -156,12 +221,34 @@ class ListView(gtk.ScrolledWindow):
                   rect.x + self.pb_w/2 + x, 
                   rect.y + self.pb_h/2 - 1 + y, 
                   str(value) + "%", color, font_size)
-
+        
 if __name__ == "__main__":
+    def test_modify_gui():
+        mode_list.modify_data(0, 0, "沒人")
+    # test mode list.
+    mode_list = ModeList([["我来看看国产家大夫吧好", "500MB", 50, "暂时"],
+                          ["我的司機發送到佛教看來佛教所端口樓房倾国", "1GB", 70, "停止"],
+                          ["心三国", "128MB", 50, "开始"],
+                          ["心三国", "128MB", 80.5, "开始"],
+                          ["心三国", "128MB", 90, "开始"],
+                          ["心三国", "128MB", 90.8, "开始"],
+                          ["心三国", "128MB", 70.9, "开始"],
+                          ["心三国", "128MB", 60.9, "开始"],
+                          ["心三国", "128MB", 75.3, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ["心三国", "128MB", 80, "开始"],
+                          ])
+        
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    win.set_size_request(500, 500)
+    win.set_size_request(790, 500)
     win.connect("destroy", lambda w : gtk.main_quit())
-    win.add(ListView("theme/listview/title.png", "theme/listview/bg.png"))
+    win.add(ListView(mode_list, "theme/listview/title.png", "theme/listview/bg.png"))
     win.show_all()
+    gtk.timeout_add(1500, test_modify_gui)    
     gtk.main()
     
