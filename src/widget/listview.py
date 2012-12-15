@@ -225,6 +225,8 @@ class ListView(gtk.ScrolledWindow):
 if __name__ == "__main__":
     def test_modify_gui():
         mode_list.modify_data(0, 0, "沒人")
+        mode_list.modify_data(0, 1, "100MB")
+        mode_list.modify_data(0, 2, 88.9)
     # test mode list.
     mode_list = ModeList([["我来看看国产家大夫吧好", "500MB", 50, "暂时"],
                           ["我的司機發送到佛教看來佛教所端口樓房倾国", "1GB", 70, "停止"],
