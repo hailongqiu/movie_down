@@ -81,6 +81,10 @@ class ListView(gtk.ScrolledWindow):
         self.file_size_x_padding = self.file_name_x_padding + 150
         # init down state values.
         self.down_state_x_pdding = 700
+        self.error_pixbuf = gtk.gdk.pixbuf_new_from_file("theme/listview/error.png")
+        self.wait_pixbuf = gtk.gdk.pixbuf_new_from_file("theme/listview/wait.png")
+        self.working_pixbuf = gtk.gdk.pixbuf_new_from_file("theme/listview/working.png")
+        self.success_pixbuf = gtk.gdk.pixbuf_new_from_file("theme/listview/success.png")
         #
         self.bg_pixbuf = gtk.gdk.pixbuf_new_from_file(bg_pixbuf)
         self.draw_main_gui = gtk.Button()
@@ -148,7 +152,7 @@ class ListView(gtk.ScrolledWindow):
                               y=mode_index *self.selectt_height + self.pb_y_padding)
         self.draw_down_state(cr, rect, state=i[3], 
                              x=self.down_state_x_pdding, 
-                             y=mode_index * self.selectt_height + self.file_y_pdding)
+                             y=mode_index * self.selectt_height + self.file_y_pdding - self.error_pixbuf.get_height()/2)
         
     def draw_file_name(self, cr, rect, name, x=0, y=0):    
         name = name.decode("utf-8")
@@ -160,7 +164,20 @@ class ListView(gtk.ScrolledWindow):
         draw_text(cr, rect.x + x, rect.y + y, str(size), ("#000000", 1), 10)
                 
     def draw_down_state(self, cr, rect, state, x=0, y=0):    
-        draw_text(cr, rect.x + x, rect.y + y, str(state), ("#000000", 1), 10)
+        state_pixbuf = None
+        if state == "error": # 错误
+            state_pixbuf = self.error_pixbuf
+        elif state == "success": # 下载完成
+            state_pixbuf = self.success_pixbuf
+        elif state == "wait":   # 等待
+            state_pixbuf = self.wait_pixbuf
+        elif state == "working": # 正在下载
+            state_pixbuf = self.working_pixbuf
+        #    
+        if state_pixbuf:    
+            draw_pixbuf(cr, state_pixbuf, rect.x + x, rect.y + y)
+        else:    
+            draw_text(cr, rect.x + x, rect.y + y, str(state), ("#000000", 1), 10)
         
     def draw_background(self, cr, rect):
         bg_pixbuf = self.bg_pixbuf.scale_simple(rect.width, rect.height, gtk.gdk.INTERP_BILINEAR)
@@ -228,22 +245,22 @@ if __name__ == "__main__":
         mode_list.modify_data(0, 1, "100MB")
         mode_list.modify_data(0, 2, 88.9)
     # test mode list.
-    mode_list = ModeList([["我来看看国产家大夫吧好", "500MB", 50, "暂时"],
-                          ["我的司機發送到佛教看來佛教所端口樓房倾国", "1GB", 70, "停止"],
-                          ["心三国", "128MB", 50, "开始"],
-                          ["心三国", "128MB", 80.5, "开始"],
-                          ["心三国", "128MB", 90, "开始"],
-                          ["心三国", "128MB", 90.8, "开始"],
-                          ["心三国", "128MB", 70.9, "开始"],
-                          ["心三国", "128MB", 60.9, "开始"],
-                          ["心三国", "128MB", 75.3, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
-                          ["心三国", "128MB", 80, "开始"],
+    mode_list = ModeList([["我来看看国产家大夫吧好", "500MB", 50, "wait"],
+                          ["我的司機發送到佛教看來佛教所端口樓房倾国", "1GB", 70, "error"],
+                          ["心三国", "128MB", 50, "wait"],
+                          ["心三国", "128MB", 80.5, "working"],
+                          ["心三国", "128MB", 100, "success"],
+                          ["心三国", "128MB", 90.8, "wait"],
+                          ["心三国", "128MB", 70.9, "working"],
+                          ["心三国", "128MB", 60.9, "wait"],
+                          ["心三国", "128MB", 75.3, "wait"],
+                          ["心三国", "128MB", 80, "wait"],
+                          ["心三国", "128MB", 80, "wait"],
+                          ["心三国", "128MB", 80, "wait"],
+                          ["心三国", "128MB", 80, "wait"],
+                          ["心三国", "128MB", 80, "wait"],
+                          ["心三国", "128MB", 100, "success"],
+                          ["心三国", "128MB", 100, "success"],
                           ])
         
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
