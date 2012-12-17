@@ -52,6 +52,18 @@ def draw_text(cr, x, y, text, color_alpha, text_size = 12):
     context.update_layout(layout)
     context.show_layout(layout)
     return text_width, text_height
+
+def new_draw_text(cr, x, y, text, color_alpha, text_size = 12):
+    context = pangocairo.CairoContext(cr)
+    layout = context.create_layout()
+    layout.set_font_description(pango.FontDescription("%s %s" % (DEFAULT_FONT, text_size)))
+    cr.set_source_rgba(*alpha_color_hex_to_cairo(color_alpha))
+    layout.set_text(text)
+    (text_width, text_height) = layout.get_pixel_size()
+    cr.move_to(x, y)
+    context.update_layout(layout)
+    context.show_layout(layout)
+    return text_width, text_height
     
 def alpha_color_hex_to_cairo((color, alpha)):
     (r, g, b) = color_hex_to_cairo(color)

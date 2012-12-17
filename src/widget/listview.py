@@ -23,10 +23,9 @@
 from function import draw_text, draw_pixbuf, alpha_color_hex_to_cairo
 import gtk
 import gobject
-'''MVC模式'''
+
 
 class ModeList(gobject.GObject):
-    '''模式'''
     __gsignals__ = {        
         "update-data-event":(gobject.SIGNAL_RUN_LAST,
                              gobject.TYPE_NONE,(gobject.TYPE_INT, gobject.TYPE_INT, gobject.TYPE_STRING,))
@@ -40,7 +39,6 @@ class ModeList(gobject.GObject):
         self.emit("update-data-event", row, column, data)
         
 class ListView(gtk.ScrolledWindow):
-    '''視圖'''
     def __init__(self, 
                  mode_list,
                  titles_pixbuf="widget/theme/listview/title.png",

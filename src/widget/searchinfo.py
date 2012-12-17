@@ -23,6 +23,7 @@
 import gtk
 from function import draw_pixbuf
 from function import color_hex_to_cairo, draw_text, alpha_color_hex_to_cairo
+from jumppage import JumpPage
 from sound.sound import sound_play
 import gobject
 
@@ -48,8 +49,16 @@ class SearchInfo(gtk.HBox):
                 "乱世佳人(国产剧)", "国产凌凌漆(国语)", "国产凌凌漆(粤语)",
                 "兵临城下(国产) ", "(国产方兵临城下方阵 ", "(国兵临城下(百家争鸣",
                 "(国产)兵临城下武器", "COCO兵临城下泳装秀", "(国产兵临城下与启发"])        
+        self.jump_page_ali = gtk.Alignment()
+        self.jump_page = JumpPage(100)
+        self.jump_page_ali.add(self.jump_page)
+        self.jump_page_ali.set_padding(0, 0, 150, 0)
+        self.vbox = gtk.VBox()
+        self.vbox.pack_start(self.save_info_btn, False, False)
+        self.vbox.pack_start(self.jump_page_ali, False, False)
+        
         self.pack_start(self.pre_page_btn_ali, False, False)
-        self.pack_start(self.save_info_btn, False, False)
+        self.pack_start(self.vbox, False, False)
         self.pack_start(self.next_page_btn_ali, False, False)
         
 class PageBtn(gtk.Button):
