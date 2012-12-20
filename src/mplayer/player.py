@@ -65,6 +65,8 @@ class Info(object):
         
 class Player(object):        
     def __init__(self):
+        self.uri = None
+        self.state = STARTING_STATE
         self.profile = None
         self.vo = None
         self.deinterlace = None
@@ -83,8 +85,8 @@ class Player(object):
         self.volume = 0
         self.volume_gain = 0
         #
-        self.start_time = 0
-        self.run_time = 0
+        self.start_time = 0.0
+        self.run_time = 0.0
         self.frame_drop = None
         self.osdlevel = 0
         self.audio_delay = 0.0
@@ -93,6 +95,7 @@ class Player(object):
         #
         self.brightness = 0
         self.contrast = 0
+        self.gamma = 0
         self.hue = 0
         self.saturation = 0
         self.alang = None
@@ -111,7 +114,7 @@ class Player(object):
         self.subtitle_codepage = None
         self.extra_opts = None
         #
-        self.type = None
+        self.type = TYPE_FILE
         
 ####################################################################        
 ### Mplayer后端控制.
@@ -273,43 +276,44 @@ class LDMP(gobject.GObject):
             self.command.append("-endpos")
             self.command.append("%d", self.player.run_time)
             
-        # if self.player.frame_drop:    
-        #     self.command.append("-framedrop")
+        if self.player.frame_drop:    
+            self.command.append("-framedrop")
             
-        # self.command.append("-msglevel")    
-        # self.command.append("all=5")    
+        self.command.append("-msglevel")    
+        self.command.append("all=5")    
         
-        # self.command.append("-osdlevel")
-        # self.command.append("%i" % (self.player.osdlevel))
+        self.command.append("-osdlevel")
+        self.command.append("%i" % (self.player.osdlevel))
         
-        # self.command.append("-delay")
-        # self.command.append("%f" % (self.player.audio_delay))
+        self.command.append("-delay")
+        self.command.append("%f" % (self.player.audio_delay))
         
-        # self.command.append("-subdelay")
-        # self.command.append("%f" % (self.player.subtitle_delay))
+        self.command.append("-subdelay")
+        self.command.append("%f" % (self.player.subtitle_delay))
         
-        # self.command.append("-subpos")
-        # self.command.append("%d" % (self.player.subtitle_position))
+        self.command.append("-subpos")
+        self.command.append("%d" % (self.player.subtitle_position))
                         
         self.command.append("-wid")
         self.command.append(str(self.xid))
         
-        # self.command.append("-brightness")
-        # self.command.append(self.player.brightness)
-        # self.command.append("-contrast")
-        # self.command.append(self.player.contrast)
-        # self.command.append("-hue")
-        # self.command.append(self.player.hue)
-        # self.command.append("-saturation")                   
-        # self.command.append(self.player.saturation)
+        self.command.append("-brightness")
+        self.command.append(str(self.player.brightness))
         
-        # if self.player.alang:
-        #     self.command.append("-alang")
-        #     self.command.append("%s" % (self.player.alang))
+        self.command.append("-contrast")
+        self.command.append(str(self.player.contrast))
+        self.command.append("-hue")
+        self.command.append(str(self.player.hue))
+        self.command.append("-saturation")                   
+        self.command.append(str(self.player.saturation))
+        
+        if self.player.alang:
+            self.command.append("-alang")
+            self.command.append("%s" % (self.player.alang))
             
-        # if self.player.slang:    
-        #     self.command.append("-slang")
-        #     self.command.append("%s" % (self.player.slang))
+        if self.player.slang:    
+            self.command.append("-slang")
+            self.command.append("%s" % (self.player.slang))
             
         self.command.append("-nomsgcolor")    
         self.command.append("-nomsgmodule")
@@ -378,19 +382,19 @@ class LDMP(gobject.GObject):
                     if (self.player.subtitle_color and len(self.player.subtitle_color) > 0):
                         self.command.append("-ass-color");
                         self.command.append("%s" % self.player.subtitle_color);
-        # else:        
-        #      if self.player.subtitle_scale:
-        #          self.command.append("-subfont-text-scale")
-        #          self.command.append("%d" % (self.player.subtitle_scale * 3))
+        else:        
+             if self.player.subtitle_scale:
+                 self.command.append("-subfont-text-scale")
+                 self.command.append("%d" % (self.player.subtitle_scale * 3))
                         
-        #      if (self.player.subtitle_font 
-        #          and len(self.player.subtitle_font)):
-        #          fontname = self.player.subtitle_font
-        #          size = fontname.find(" ")
-        #          if size:
-        #              size[0] = '\0'
-        #              self.command.append("-subfont")    
-        #              self.command.append("%s" % (fontname))    
+             if (self.player.subtitle_font 
+                 and len(self.player.subtitle_font)):
+                 fontname = self.player.subtitle_font
+                 size = fontname.find(" ")
+                 if size:
+                     size[0] = '\0'
+                     self.command.append("-subfont")    
+                     self.command.append("%s" % (fontname))    
                         
         if (self.player.subtitle_codepage 
             and len(self.player.subtitle_codepage)):
