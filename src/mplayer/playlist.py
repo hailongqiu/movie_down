@@ -71,6 +71,21 @@ class PlayList(object):
         else:    
             return False
         
+    def get_prev_file(self): # 获取上一个播放文件
+        if self.__file_list:            
+            if self.__state == SINGLA_PLAY:
+                return self.__singla_play()
+            elif self.__state == ORDER_PLAY:
+                return self.__order_play(False)
+            elif self.__state == RANDOM_PLAY:    
+                return self.__random_play()
+            elif self.__state == SINGLE_LOOP:
+                return self.__single_loop_play()
+            elif self.__state == LIST_LOOP:
+                return self.__list_loop_play(False)
+        else:    
+            return False
+        
     def print_file_list(self): # 获取当前播放文件        
         for file_ in self.__file_list:
             print "playlist:", file_
@@ -78,12 +93,16 @@ class PlayList(object):
     def __singla_play(self): # 单曲播放
         return False
     
-    def __order_play(self): # 顺序播放
-        if self.__index + 1 > len(self.__file_list) - 1:
+    def __order_play(self, next_check=True): # 顺序播放
+        num = 1 # next.
+        if not next_check: # prev.
+            num = -1
+        if (self.__index + num > len(self.__file_list) - 1 
+            or self.__index + num < 0):
             return False
-        self.__index += 1
+        self.__index += num
         return self.__file_list[self.__index]
-            
+                                
     def __random_play(self): # 随机播放
         index = random.randint(0, len(self.__file_list)-1)
         self.__index = index
@@ -92,8 +111,11 @@ class PlayList(object):
     def __single_loop_play(self): # 单曲循环播放
         return self.__file_list[self.__index]
     
-    def __list_loop_play(self): # 列表循环播放
-        self.__index += 1
+    def __list_loop_play(self, next_check=True): # 列表循环播放
+        num = 1 # next.
+        if not next_check: # pre.
+            num = -1
+        self.__index += num
         self.__index = self.__index % (len(self.__file_list)) 
         return self.__file_list[self.__index]
     
@@ -124,14 +146,21 @@ if __name__ == "__main__":
     file = play_list.get_next_file()
     if file:
        print "file:", file
+    file = play_list.get_prev_file()
+    if file:
+       print "file:", file       
     ##########################   
     play_list.set_state(SINGLE_LOOP)   
     file = play_list.get_next_file()
     if file:
        print "file:", file
-    ##########################   
+    ##########################       
     play_list.set_state(LIST_LOOP)   
     file = play_list.get_next_file()
+    if file:
+       print "file:", file        
+    play_list.set_index("/home/long/123.rmvb")
+    file = play_list.get_prev_file()
     if file:
        print "file:", file
         
