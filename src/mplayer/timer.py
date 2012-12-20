@@ -31,7 +31,6 @@ class Timer(gobject.GObject):
     def __init__(self, interval_=0):
         gobject.GObject.__init__(self)
         self.__interval = interval_
-        print "self.interval:", self.__interval
         self.__enabled  = False # True : 开启 ; False : 关闭.
         self.__timer_id = None
         

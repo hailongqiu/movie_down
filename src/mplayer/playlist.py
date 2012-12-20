@@ -21,25 +21,117 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
+import random
+
+
+
 '''播放列表: 
        0        1       2         3          4
    { 单曲播放、顺序播放、随机播放、单曲循环播放、列表循环播放、}
 '''
 
-SINGLA_PLAY, ORDER_PLAY, RANDOM_PLAY, SINGLE_LOOP, LIST_LOOP= range(0, 5)
+
+SINGLA_PLAY, ORDER_PLAY, RANDOM_PLAY, SINGLE_LOOP, LIST_LOOP = range(0, 5)
 
 class PlayList(object):
     def __init__(self):
-        self.play_state = ORDER_PLAY # 默认顺序播放
-        self.file_list = []
+        self.__state = ORDER_PLAY # 默认顺序播放
+        self.__file_list = []
+        self.__current_file = None
+        self.__index = -1
         
-    def add_play_list(self, play_file):
-        self.file_list.append(play_file)
+    def delete(self, play_file): # 删除文件.
+        self.__file_list.remove(play_file)
         
-    def clear_play_list(self):
-        self.file_list = []
+    def append(self, play_file): # 添加文件
+        self.__file_list.append(play_file)
         
-    def singla_play(self): #单曲播放
-        pass
+    def clear(self): # 清空播放列表
+        self.__file_list = []
+        
+    def insert(self, index, play_file):    
+        self.__file_list.insert(index, play_file)
+        
+    def set_state(self, state):    
+        self.__state = state
+        
+    def get_next_file(self): # 获取下一个播放文件
+        if self.__file_list:
+            if self.__state == SINGLA_PLAY:
+                return self.__singla_play()
+            elif self.__state == ORDER_PLAY:
+                return self.__order_play()
+            elif self.__state == RANDOM_PLAY:    
+                return self.__random_play()
+            elif self.__state == SINGLE_LOOP:
+                return self.__single_loop_play()
+            elif self.__state == LIST_LOOP:
+                return self.__list_loop_play()
+        else:    
+            return False
+        
+    def print_file_list(self): # 获取当前播放文件        
+        for file_ in self.__file_list:
+            print "playlist:", file_
+                    
+    def __singla_play(self): # 单曲播放
+        return False
     
+    def __order_play(self): # 顺序播放
+        if self.__index + 1 > len(self.__file_list) - 1:
+            return False
+        self.__index += 1
+        return self.__file_list[self.__index]
+            
+    def __random_play(self): # 随机播放
+        index = random.randint(0, len(self.__file_list)-1)
+        self.__index = index
+        return self.__file_list[index]
+    
+    def __single_loop_play(self): # 单曲循环播放
+        return self.__file_list[self.__index]
+    
+    def __list_loop_play(self): # 列表循环播放
+        self.__index += 1
+        self.__index = self.__index % (len(self.__file_list)) 
+        return self.__file_list[self.__index]
+    
+    def set_index(self, play_file): # 设置index.
+        self.__index = self.__file_list.index(play_file)
+        
+    
+if __name__ == "__main__":    
+    play_list = PlayList()
+    # play_list.set_state(SINGLA_PLAY)
+    # play_list.set_state(ORDER_PLAY)
+    play_list.set_state(RANDOM_PLAY)
+    play_list.append("/home/long/123.rmvb")
+    play_list.append("/home/long/123.rmvb123")
+    play_list.append("/home/long/123.rmvb134")
+    play_list.append("/home/longfdjsfj/123.rmvb134")
+    play_list.append("/home房间打扫房间/longfdjsfj/123.rmvb134")
+    #############################################################
+    play_list.set_index("/home/longfdjsfj/123.rmvb134") 
+    # play_list.delete("/home/long/123.rmvb")
+    ####################
+    play_list.print_file_list()
+    file = play_list.get_next_file()
+    if file:
+       print "file:", file
+    ##########################   
+    play_list.set_state(ORDER_PLAY)   
+    file = play_list.get_next_file()
+    if file:
+       print "file:", file
+    ##########################   
+    play_list.set_state(SINGLE_LOOP)   
+    file = play_list.get_next_file()
+    if file:
+       print "file:", file
+    ##########################   
+    play_list.set_state(LIST_LOOP)   
+    file = play_list.get_next_file()
+    if file:
+       print "file:", file
         

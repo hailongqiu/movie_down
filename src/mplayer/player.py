@@ -21,8 +21,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from timer import Timer
+from playlist import (PlayList, SINGLA_PLAY, ORDER_PLAY, RANDOM_PLAY, SINGLE_LOOP, LIST_LOOP)
 import gobject
-import urlparse
 import subprocess        
 import fcntl
 import gtk
@@ -482,7 +482,7 @@ class LDMP(gobject.GObject):
         self.timer.connect("Tick", self.thread_query)
         self.timer.Enabled = True 
         #
-        # gobject.timeout_add_seconds(1, self.thread_query, 1)        
+        gobject.timeout_add_seconds(1, self.thread_query, 1)        
         #
         self.get_time_length()
         # 测试输出.
@@ -1200,13 +1200,21 @@ if __name__ == "__main__":
         
     def end_media_player(mp):    
         print '播放结束了'
-        # mp.play("../../../../../test.rmvb")
-        set_flags(screen)
-        screen_frame.set(0.0, 0.0, 1.0, 1.0)
+        mp.player.uri = play_list.get_next_file()
+        mp.play()
+        print "fdjsklfjds"
+        # set_flags(screen)
+        # screen_frame.set(0.0, 0.0, 1.0, 1.0)
         
     def rect_error_msg(mp, msg):
         print "error_msg:", msg
         
+    play_list = PlayList()    
+    play_list.set_state(ORDER_PLAY)
+    play_list.append("http://f.youku.com/player/getFlvPath/sid/00_00/st/flv/fileid/030002010050D29B0C1EB704E9D2A70A597BC9-661F-04B6-2574-7696D26555A6?K=25078da9c15b9aeb261cbce1")
+    play_list.append("file:///home/long/Desktop/test.rmvb")
+
+    ####################################
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
     win.set_size_request(300, 300)
     vbox = gtk.VBox()
@@ -1242,11 +1250,9 @@ if __name__ == "__main__":
     vbox.show_all()
     #
     mp = LDMP(get_window_xid(screen))
-    mp.player.uri = "file:///home/long/Desktop/test.rmvb"
-    mp.player.uri = "http://f.youku.com/player/getFlvPath/sid/00_00/st/flv/fileid/030002010050D29B0C1EB704E9D2A70A597BC9-661F-04B6-2574-7696D26555A6?K=25078da9c15b9aeb261cbce1"
+    mp.player.uri = play_list.get_next_file()
     mp.player.type = TYPE_NETWORK
     mp.play()
-    # mp.play("../../../123.mp3")
     mp.connect("get-time-pos", get_time_pos_test)    
     mp.connect("get-time-length", get_time_length_test)    
     mp.connect("end-media-player", end_media_player)
