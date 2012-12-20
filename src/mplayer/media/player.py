@@ -32,6 +32,26 @@ DEBUG = 0
 (STOPING_STATE, PAUSE_STATE, STARTING_STATE)= range(0, 3)
 (CHANNEL_NORMAL_STATE, CHANNEL_LEFT_STATE, CHANNEL_RIGHT_STATE ) = range(0, 3)
 
+############################################################################
+###  保存获取的信息
+class Info(object):
+    def __init__(self):
+        self.file_name = "" # 文件名
+        # 分辨率.
+        self.width = 0 # 宽
+        self.height = 0 # 高
+        # 总长度.
+        self.length = 0 # 媒体时长
+        # 视频.
+        self.video_format = None # 编码格式
+        self.video_bitrate = None # 视频码率  
+        self.video_fps = None # 视频帧率
+        # 音频.
+        self.audio_foramt = None # 编码格式.
+        self.audio_bitrate = None # 音频码率
+        self.audio_nch = None # 声道数.
+        self.audio_rate = None # 采样数.
+
 ####################################################################        
 ### Mplayer后端控制.
 class LDMP(gobject.GObject):
@@ -43,6 +63,8 @@ class LDMP(gobject.GObject):
                            gobject.TYPE_NONE,(gobject.TYPE_INT, gobject.TYPE_STRING,)),
         "end-media-player":(gobject.SIGNAL_RUN_LAST,
                             gobject.TYPE_NONE,()),
+        "error-msg":(gobject.SIGNAL_RUN_LAST,
+                            gobject.TYPE_NONE,(gobject.TYPE_STRING,)),        
         }
     def __init__(self, xid=None):
         gobject.GObject.__init__(self)        
@@ -55,11 +77,14 @@ class LDMP(gobject.GObject):
         self.channel_state = CHANNEL_NORMAL_STATE
         self.state = STOPING_STATE
         self.path = None
-        self.length = 0
         
     def play(self, path):        
+        # 保存文件路径.
         self.path = path
+        # 初始化状态.
         self.state = STARTING_STATE
+        # 获取播放文件信息.
+        self.file_info = Info()
         #
         command = ['mplayer',
                    # '-vo',
@@ -83,15 +108,11 @@ class LDMP(gobject.GObject):
                                       shell = False)
             
         self.mplayer_pid = self.mp_id.pid
-        print "self.mppid:", self.mplayer_pid
         (self.mplayer_in, self.mplayer_out, self.mplayer_err) = (self.mp_id.stdin, self.mp_id.stdout, self.mp_id.stderr)
         fcntl.fcntl(self.mplayer_out, 
                         fcntl.F_SETFL, 
                         os.O_NONBLOCK)            
-        
-        self.timer = Timer(1000)
-        self.timer.connect("Tick", self.thread_query)
-        self.timer.Enabled = True 
+                
         # IO_HUP[Monitor the pipeline is disconnected].
         self.watch_in_id = gobject.io_add_watch(self.mplayer_out, 
                                                 gobject.gobject.IO_IN, 
@@ -102,20 +123,25 @@ class LDMP(gobject.GObject):
         self.watch_in_hup_id = gobject.io_add_watch(self.mplayer_out, 
                                                     gobject.IO_HUP, 
                                                     self.player_thread_complete)
+        #
+        self.timer = Timer(1000)
+        self.timer.connect("Tick", self.thread_query)
+        self.timer.Enabled = True 
+        #
+        # gobject.timeout_add_seconds(1, self.thread_query, 1)        
+        #
         self.get_time_length()
-        # 获取播放文件信息.
-        # self.file_info = Info(path, VIDEO_TYPE)        
         # 测试输出.
-        # if DEBUG:
-        #     print self.file_info.file_name
-        #     print length_to_time(int(self.file_info.length))
-        #     print self.file_info.video_format
-        #     print self.file_info.video_bitrate
-        #     print self.file_info.video_fps
-        #     print self.file_info.audio_foramt
-        #     print self.file_info.audio_nch
-        #     print self.file_info.audio_bitrate
-        #     print self.file_info.audio_rate
+        if DEBUG:
+            print self.file_info.file_name
+            print length_to_time(int(self.file_info.length))
+            print self.file_info.video_format
+            print self.file_info.video_bitrate
+            print self.file_info.video_fps
+            print self.file_info.audio_foramt
+            print self.file_info.audio_nch
+            print self.file_info.audio_bitrate
+            print self.file_info.audio_rate
                         
     def thread_query(self, tick):
         self.get_time_pos()
@@ -436,14 +462,12 @@ class LDMP(gobject.GObject):
             pos =  float(buffer.replace("ANS_TIME_POSITION=", "").split("\n")[0])
             if pos >= 0:
                 self.emit("get-time-pos", pos)
-            if pos > self.length:    
+            if pos > self.file_info.length: # 播放结束.
                 self.quit()
-                self.get_time_length()
                 
         if buffer.startswith("ANS_LENGTH"):
             length = float(buffer.replace("ANS_LENGTH=", "").split("\n")[0])
-            self.length = length
-            print "LENGTH:", length
+            self.file_info.length = length
             
         return True
     
@@ -453,9 +477,11 @@ class LDMP(gobject.GObject):
             remove_timeout_id(self.watch_in_hup_id)
             remove_timeout_id(self.watch_in_id)            
             return False
-        
-        buffer = source.readline()
-        
+        try:
+            buffer = source.readline()
+        except Exception , e:
+            error_msg = e            
+            buffer = ""
         # if buffer.startswith("ANS") == None:
         #     print "error: %s", buffer
             
@@ -472,111 +498,42 @@ class LDMP(gobject.GObject):
         #     pass
         
         if buffer.find("Seek failed") != -1:
-            print "999999999999999999"
-            remove_timeout_id(self.watch_in_hup_id)
-            remove_timeout_id(self.watch_in_id)            
+            # remove_timeout_id(self.watch_in_hup_id)
+            # remove_timeout_id(self.watch_in_id)            
             self.quit()
-        #     pass
         
         if error_msg != None:
-            # self.emit("")
-            pass
+            self.emit("error-msg", error_msg)
+    
         return True
     
     def player_thread_complete(self, source, condition): 
-        print "i love cna d linu"
-        self.quit()
-        return False
-    
-    def quit(self): # 退出.
-        self.cmd('quit \n')
+        if DEBUG:
+            print "player_thread_complete:", "断开管道!!"
         try:
+            # modify state.
             self.state = STOPING_STATE
+            # close fd.
             self.mplayer_in.close()
             self.mplayer_out.close()
             self.mplayer_err.close()
+            # kill mplayer.
             self.mp_id.kill() 
             os.system("kill %s" % (self.mplayer_pid)) # 杀死 mplayer pid.
-            self.timer.Enabled = False # 关闭发送get-time-pos命令的时钟.
+            self.timer.Enabled = False # 关闭发送get-time-pos命令的时钟.            
             self.emit("end-media-player")
-        except StandardError:
-            pass
+        except StandardError, e:
+            print "player_thread_complete:", e
+        return False
+    
+    def quit(self): # 退出.
+        self.cmd('quit \n')       
                 
 def remove_timeout_id(callback_id):
     if callback_id:
         gobject.source_remove(callback_id)
         callback_id = None
-        
-############################################################################
-###  保存获取的信息
-class Info(object):
-    def __init__(self, path, video_type):
-        self.file_name = "" # 文件名
-        # 分辨率.
-        self.width = 0 # 宽
-        self.height = 0 # 高
-        # 总长度.
-        self.length = 0 # 媒体时长
-        # 视频.
-        self.video_format = None # 编码格式
-        self.video_bitrate = None # 视频码率  
-        self.video_fps = None # 视频帧率
-        # 音频.
-        self.audio_foramt = None # 编码格式.
-        self.audio_bitrate = None # 音频码率
-        self.audio_nch = None # 声道数.
-        self.audio_rate = None # 采样数.
-        self.get_video_information(path, video_type)
-        
-    def get_video_information(self, video_path, video_type=VIDEO_TYPE):
-        if video_type == VIDEO_TYPE:
-            cmd = "mplayer -identify -frames 5 -endpos 0 -vo null  '%s'" % (video_path)
-        elif video_type == DVD_TYPE:
-            cmd = "mplayer -vo null -ao null -frames 0 -identify "
-            cmd += "dvd:// -dvd-device '%s'" % (video_path)
-            
-        pipe = os.popen(str(cmd))
-        
-        return self.video_string_to_information(pipe, video_path)
-        
-    def video_string_to_information(self, pipe, video_path):
-        while True: 
-            try:
-                line_text = pipe.readline()
-            except StandardError:
-                break
-        
-            if not line_text:
-                break
-            
-            # 保存获取的信息.
-            if line_text.startswith("ID_FILENAME="): # 文件名.
-                self.file_name = line_text.replace("ID_FILENAME=", "").split("\n")[0]                
-            # 分辨率(宽，高).    
-            elif line_text.startswith("ID_VIDEO_WIDTH="): # 分辨率. 宽
-                self.width = line_text.replace("ID_VIDEO_WIDTH=", "").split("\n")[0]
-            elif line_text.startswith("ID_VIDEO_HEIGHT="): # 分辨率. 高
-                self.height = line_text.replace("ID_VIDEO_HEIGHT=", "").split("\n")[0]
-            # 总长度    
-            elif line_text.startswith("ID_LENGTH="): # 媒体时长.
-                self.length = float(line_text.replace("ID_LENGTH=", "").split("\n")[0])
-            # 视频.    
-            elif line_text.startswith("ID_VIDEO_FORMAT="): # 编码格式.
-                self.video_format = line_text.replace("ID_VIDEO_FORMAT=", "").split("\n")[0]
-            elif line_text.startswith("ID_VIDEO_BITRATE="): # 视频码率 
-                self.video_bitrate = line_text.replace("ID_VIDEO_BITRATE=", "").split("\n")[0]
-            elif line_text.startswith("ID_VIDEO_FPS="): # 视频帧率.
-                self.video_fps = line_text.replace("ID_VIDEO_FPS=", "").split("\n")[0]
-            # 音频.
-            elif line_text.startswith("ID_AUDIO_FORMAT="): # 编码格式.
-                self.audio_foramt = line_text.replace("ID_AUDIO_FORMAT=", "").split("\n")[0]
-            elif line_text.startswith("ID_AUDIO_BITRATE="): # 音频码率
-                self.audio_bitrate = line_text.replace("ID_AUDIO_BITRATE=", "").split("\n")[0]
-            elif line_text.startswith("ID_AUDIO_NCH="):   # 声道数.
-                self.audio_nch = line_text.replace("ID_AUDIO_NCH=", "").split("\n")[0]
-            elif line_text.startswith("ID_AUDIO_RATE="):  # 采样数.
-                self.audio_rate = line_text.replace("ID_AUDIO_RATE=", "").split("\n")[0]
-                               
+                                               
 ########################################################                
 ## 转换时间的函数.                
 def length_to_time(length):  
@@ -668,7 +625,7 @@ if __name__ == "__main__":
         mp.pause()
         
     def fseek_btn_clicked(widget):    
-        mp.fseek(5)
+        mp.fseek(50)
         
     def draw_screen(widget, event):    
         cr = widget.window.cairo_create()
@@ -681,12 +638,11 @@ if __name__ == "__main__":
         gtk.main_quit()        
         
     def end_media_player(mp):    
-        print '播放那个结束了'
-        print mp
-        win.show_all()
-        screen.show_all()
+        print '播放结束了'
         mp.play("../../../../../test.rmvb")
-        screen_frame.show_all()
+        
+    def rect_error_msg(mp, msg):
+        print "error_msg:", msg
         
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
     win.set_size_request(300, 300)
@@ -728,4 +684,5 @@ if __name__ == "__main__":
     mp.connect("get-time-pos", get_time_pos_test)    
     mp.connect("get-time-length", get_time_length_test)    
     mp.connect("end-media-player", end_media_player)
+    mp.connect("error-msg", rect_error_msg)
     gtk.main()
