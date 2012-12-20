@@ -26,8 +26,20 @@
    { 单曲播放、顺序播放、随机播放、单曲循环播放、列表循环播放、}
 '''
 
-print range(0, 5)
+SINGLA_PLAY, ORDER_PLAY, RANDOM_PLAY, SINGLE_LOOP, LIST_LOOP= range(0, 5)
 
 class PlayList(object):
     def __init__(self):
+        self.play_state = ORDER_PLAY # 默认顺序播放
+        self.file_list = []
+        
+    def add_play_list(self, play_file):
+        self.file_list.append(play_file)
+        
+    def clear_play_list(self):
+        self.file_list = []
+        
+    def singla_play(self): #单曲播放
         pass
+    
+        

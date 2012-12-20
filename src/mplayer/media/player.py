@@ -39,6 +39,10 @@ class LDMP(gobject.GObject):
     __gsignals__ = {
         "get-time-pos":(gobject.SIGNAL_RUN_LAST,
                         gobject.TYPE_NONE,(gobject.TYPE_INT,)),
+        "get-time-length":(gobject.SIGNAL_RUN_LAST,
+                           gobject.TYPE_NONE,(gobject.TYPE_INT, gobject.TYPE_STRING,)),
+        "end-media-player":(gobject.SIGNAL_RUN_LAST,
+                            gobject.TYPE_NONE,()),
         }
     def __init__(self, xid=None):
         gobject.GObject.__init__(self)        
@@ -51,6 +55,7 @@ class LDMP(gobject.GObject):
         self.channel_state = CHANNEL_NORMAL_STATE
         self.state = STOPING_STATE
         self.path = None
+        self.length = 0
         
     def play(self, path):        
         self.path = path
@@ -60,9 +65,9 @@ class LDMP(gobject.GObject):
                    # '-vo',
                    # 'gl,2,x11,xv',
                    # '-zoom',
-                   # '-nokeepaspect',
-                   # '-osdlevel',
-                   # '0',
+                   '-nokeepaspect',
+                   '-osdlevel',
+                   '0',
                    '-double',
                    '-slave',
                    '-quiet']            
@@ -78,58 +83,59 @@ class LDMP(gobject.GObject):
                                       shell = False)
             
         self.mplayer_pid = self.mp_id.pid
-        (self.mplayer_in, self.mplayer_out) = (self.mp_id.stdin, self.mp_id.stdout)
+        print "self.mppid:", self.mplayer_pid
+        (self.mplayer_in, self.mplayer_out, self.mplayer_err) = (self.mp_id.stdin, self.mp_id.stdout, self.mp_id.stderr)
         fcntl.fcntl(self.mplayer_out, 
                         fcntl.F_SETFL, 
                         os.O_NONBLOCK)            
-        # 发送播放的 pos.
-        self.get_position_id = Timer(1)
-        self.get_position_id.Enabled = True
-        self.get_position_id.connect("Tick", self.get_time_pos_timeout)        
         
+        self.timer = Timer(1000)
+        self.timer.connect("Tick", self.thread_query)
+        self.timer.Enabled = True 
         # IO_HUP[Monitor the pipeline is disconnected].
-        self.eof_id = gobject.io_add_watch(self.mplayer_out, gobject.IO_HUP, self.mplayer_eof)
+        self.watch_in_id = gobject.io_add_watch(self.mplayer_out, 
+                                                gobject.gobject.IO_IN, 
+                                                self.player_thread_reader)
+        self.watch_err_id = gobject.io_add_watch(self.mplayer_err, 
+                                                 gobject.IO_IN, 
+                                                 self.player_thread_reader_error)
+        self.watch_in_hup_id = gobject.io_add_watch(self.mplayer_out, 
+                                                    gobject.IO_HUP, 
+                                                    self.player_thread_complete)
+        self.get_time_length()
         # 获取播放文件信息.
-        self.file_info = Info(path, VIDEO_TYPE)
+        # self.file_info = Info(path, VIDEO_TYPE)        
         # 测试输出.
-        if DEBUG:
-            print self.file_info.file_name
-            print length_to_time(int(self.file_info.length))
-            print self.file_info.video_format
-            print self.file_info.video_bitrate
-            print self.file_info.video_fps
-            print self.file_info.audio_foramt
-            print self.file_info.audio_nch
-            print self.file_info.audio_bitrate
-            print self.file_info.audio_rate
+        # if DEBUG:
+        #     print self.file_info.file_name
+        #     print length_to_time(int(self.file_info.length))
+        #     print self.file_info.video_format
+        #     print self.file_info.video_bitrate
+        #     print self.file_info.video_fps
+        #     print self.file_info.audio_foramt
+        #     print self.file_info.audio_nch
+        #     print self.file_info.audio_bitrate
+        #     print self.file_info.audio_rate
                         
+    def thread_query(self, tick):
+        self.get_time_pos()
+        
     '''获取Mplayer时间.''' # t123456
     def get_percent_pos(self): # 获取当前位置为整数的百分比 
         self.cmd('get_percent_pos\n')
-        return self.get_info("ANS_PERCENT_POSITION")
+        # return self.get_info("ANS_PERCENT_POSITION")
             
     def get_sub_visibility(self):    
         self.cmd("get_sub_visibility\n")
         
     def get_time_length(self):    
         self.cmd('get_time_length\n')
-        return self.get_info("ANS_LENGTH")
+        # return self.get_info("ANS_LENGTH")
     
     def get_time_pos(self): # 当前位置用秒表示，采用浮点数.
         self.cmd('get_time_pos\n')
-        return self.get_info("ANS_TIME_POSITION").split("\n")[0]
+        # return self.get_info("ANS_TIME_POSITION").split("\n")[0]
                                         
-    def get_time_pos_timeout(self, tick):
-        try:
-            pos = float(self.get_time_pos().replace("=", ""))
-            self.get_position_id.Interval = 200
-            self.emit("get-time-pos", pos)
-        except Exception, e:    
-            if DEBUG:
-                print "pos error:", e
-            else:    
-                pass
-                    
     def get_info(self, info_flags): # 获取返回信息.
         while True:
             try:
@@ -385,16 +391,20 @@ class LDMP(gobject.GObject):
             
     def fseek(self, seek_num):
         '''Fast forward'''
-        if self.state == STARTING_STATE:
+        if self.state == STARTING_STATE or self.state == PAUSE_STATE:
             self.cmd('seek +%d\n' % (seek_num))   
             
     def bseek(self, seek_num):
         '''backward'''
-        if self.state == STARTING_STATE:
+        if self.state == STARTING_STATE or self.state == PAUSE_STATE:
             self.cmd('seek -%d\n' % (seek_num))
             
     def pause(self, pause_dvd=False):
-        if (self.state == STARTING_STATE):
+        if (self.state == STARTING_STATE or self.state == PAUSE_STATE):
+            if self.state == PAUSE_STATE:
+                self.state = STARTING_STATE
+            else:    
+                self.state = PAUSE_STATE
             self.cmd('pause \n')
         
     '''截图'''
@@ -416,30 +426,82 @@ class LDMP(gobject.GObject):
             if DEBUG:
                 print 'command error %s' % (e)            
 
-    '''Mplayer播放结束的时候'''        
-    def mplayer_eof(self, error, mplayer):
-        '''Monitoring disconnect'''
-        if DEBUG:
-            print "文件播放出错!!", error
-        self.quit()
-        self.mplayer_in, self.mplayer_out = None, None
-        return False            
+    '''mplayer 管道控制'''
+    def player_thread_reader(self, source, condition):    
+        if source == None:
+            return False        
+        buffer = source.readline()
         
+        if buffer.startswith("ANS_TIME_POSITION"):
+            pos =  float(buffer.replace("ANS_TIME_POSITION=", "").split("\n")[0])
+            if pos >= 0:
+                self.emit("get-time-pos", pos)
+            if pos > self.length:    
+                self.quit()
+                self.get_time_length()
+                
+        if buffer.startswith("ANS_LENGTH"):
+            length = float(buffer.replace("ANS_LENGTH=", "").split("\n")[0])
+            self.length = length
+            print "LENGTH:", length
+            
+        return True
+    
+    def player_thread_reader_error(self, source, condition):
+        error_msg = None
+        if source == None:
+            remove_timeout_id(self.watch_in_hup_id)
+            remove_timeout_id(self.watch_in_id)            
+            return False
+        
+        buffer = source.readline()
+        
+        # if buffer.startswith("ANS") == None:
+        #     print "error: %s", buffer
+            
+        # if not buffer.startswith("Couldn't open DVD device"):
+        #     error_msg = buffer
+            
+        # if not buffer.startswith("X11 error"):    
+        #     pass
+        
+        # if buffer.startswith("signal") != None:
+        #     pass
+        
+        # if buffer.startswith("Failed creating VDPAU decoder"):
+        #     pass
+        
+        if buffer.find("Seek failed") != -1:
+            print "999999999999999999"
+            remove_timeout_id(self.watch_in_hup_id)
+            remove_timeout_id(self.watch_in_id)            
+            self.quit()
+        #     pass
+        
+        if error_msg != None:
+            # self.emit("")
+            pass
+        return True
+    
+    def player_thread_complete(self, source, condition): 
+        print "i love cna d linu"
+        self.quit()
+        return False
+    
     def quit(self): # 退出.
-        self.get_position_id.Enabled = False        
-        self.stop_eof_id()
-        self.cmd('quit \n')            
+        self.cmd('quit \n')
         try:
             self.state = STOPING_STATE
             self.mplayer_in.close()
             self.mplayer_out.close()
-            self.mp_id.kill()
+            self.mplayer_err.close()
+            self.mp_id.kill() 
+            os.system("kill %s" % (self.mplayer_pid)) # 杀死 mplayer pid.
+            self.timer.Enabled = False # 关闭发送get-time-pos命令的时钟.
+            self.emit("end-media-player")
         except StandardError:
             pass
-        
-    def stop_eof_id(self):        
-        remove_timeout_id(self.eof_id)
-        
+                
 def remove_timeout_id(callback_id):
     if callback_id:
         gobject.source_remove(callback_id)
@@ -589,10 +651,15 @@ def set_flags(screen):
     '''Set double buffer.'''
     screen.set_flags(gtk.DOUBLE_BUFFERED)
 
+#########################################################    
+## test.    
 if __name__ == "__main__":            
     def get_time_pos_test(mp, pos):
         print "pos:", pos
         pb_btn.set_label(str(pos))
+        
+    def get_time_length_test(mp, length, time):    
+        print "length:", length, "time:", time
         
     def modify_ascept(widget, event):
         set_ascept_function(screen_frame, 4.0/3.0)
@@ -600,10 +667,32 @@ if __name__ == "__main__":
     def pause_clicked(widget):    
         mp.pause()
         
+    def fseek_btn_clicked(widget):    
+        mp.fseek(5)
+        
+    def draw_screen(widget, event):    
+        cr = widget.window.cairo_create()
+        rect = widget.allocation
+        cr.rectangle(rect.x, rect.y, rect.width, rect.height)
+        cr.fill()
+        
+    def quit_window(widget):    
+        mp.quit()
+        gtk.main_quit()        
+        
+    def end_media_player(mp):    
+        print '播放那个结束了'
+        print mp
+        win.show_all()
+        screen.show_all()
+        mp.play("../../../../../test.rmvb")
+        screen_frame.show_all()
+        
     win = gtk.Window(gtk.WINDOW_TOPLEVEL)
     win.set_size_request(300, 300)
     vbox = gtk.VBox()
     screen_frame = gtk.Alignment()
+    screen_frame.connect("expose-event", draw_screen)
     screen_frame.set(0, 0, 1, 1)
     screen = gtk.DrawingArea()
     screen_frame.add(screen)    
@@ -616,19 +705,27 @@ if __name__ == "__main__":
     
     hbox = gtk.HBox()
     pause_btn = gtk.Button("暂停")
+    fseek_btn = gtk.Button("快进")
     pause_btn.connect("clicked", pause_clicked)
+    fseek_btn.connect("clicked", fseek_btn_clicked)
     hbox.pack_start(pause_btn, False, False)
+    hbox.pack_start(fseek_btn, False, False)
+    
     vbox.pack_start(screen_frame, True, True)
     vbox.pack_start(pb_btn, False, False)
     vbox.pack_start(hbox, False, False)
     
     win.add(vbox)
-    win.connect("destroy", lambda w : gtk.main_quit())
+    win.connect("destroy", quit_window)
     win.connect("configure-event", modify_ascept)
     win.connect("check-resize", modify_ascept, 1)
     win.show_all()
+    vbox.show_all()
     #
     mp = LDMP(get_window_xid(screen))
-    mp.play("../../test.rmvb")
+    mp.play("../../../../../test.rmvb")
+    # mp.play("../../../../../123.mp3")
     mp.connect("get-time-pos", get_time_pos_test)    
+    mp.connect("get-time-length", get_time_length_test)    
+    mp.connect("end-media-player", end_media_player)
     gtk.main()
