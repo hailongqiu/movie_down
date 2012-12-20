@@ -45,6 +45,7 @@ class Player(object):
         self.cache_size = 0
         self.force_cache = 0
         self.state = STARTING_STATE
+        self.channel_state = CHANNEL_NORMAL_STATE
         self.profile = None
         self.vo = None
         self.deinterlace = None
@@ -102,6 +103,16 @@ class Player(object):
         self.tv_fps = 0
         self.title_is_menu = False
         
+        self.seekable = False
+        self.has_chapters = False
+        self.video_present = False
+        self.position = 0.0
+        self.cache_percent = -1.0                
+        self.retry_on_full_cache = False
+        self.subtitle = []        
+        self.audio_track = ''
+        self.playback_error = 0;
+        
 ####################################################################        
 ### Mplayer后端控制.
 class LDMP(gobject.GObject):
@@ -122,28 +133,13 @@ class LDMP(gobject.GObject):
         self.xid = xid
         self.player = Player()
         
-    def play(self):        
-        self.channel_state = CHANNEL_NORMAL_STATE
-        self.state = STOPING_STATE
-        self.uri = ""
-        self.seekable = False
-        self.has_chapters = False
-        self.video_present = False
-        self.position = 0.0
-        self.cache_percent = -1.0        
-        self.enable_divx = True
-        self.disable_xvmc = False
-        self.retry_on_full_cache = False
-        self.subtitle = []        
-        self.audio_track = ''
-        self.playback_error = 0;
-        #
-        ###########################################################
-        filename = ""
-        if self.player.uri:
-            filename = urlparse.urlparse(self.player.uri).path
-            if filename:
-                self.player.type = TYPE_FILE
+    def play(self):                
+        # 获取播放文件名.
+        # filename = ""
+        # if self.player.uri:
+            # filename = ur# lparse.urlparse(self.player.uri).path
+            # if filename:
+                # self.player.type = TYPE_FILE
                 
         codecs_vdpau = None
         codecs_crystalhd = None
@@ -398,11 +394,12 @@ class LDMP(gobject.GObject):
                 
         ############## 判断播放类型        
         if self.player.type == TYPE_FILE:
-            if filename:
+            # if filename:
                 if self.player.force_cache and self.player.cache_size >= 32:
                     self.command.append("-cache")
                     self.command.append("%d" % (self.player.cache_size))
-                self.command.append(str(filename))    
+                # self.command.append(str(filename))    
+                self.command.append(str(self.player.uri))    
         elif self.player.type == TYPE_CD:
             self.command.append("-cache")
             self.command.append("%d" % (self.cache_size))
@@ -430,6 +427,8 @@ class LDMP(gobject.GObject):
             if self.player.cache_size >= 32:
                 self.command.append("-cache")
                 self.command.append("%d" % (self.player.cache_size))
+            if self.player.uri.startswith("http://"):    
+                self.command.append("-nocache")    
             self.command.append("%s" % (self.player.uri))
         elif self.player.type == TYPE_DVB and self.player.type == TYPE_TV:
             if self.player.tv_device:
@@ -453,12 +452,9 @@ class LDMP(gobject.GObject):
             self.command.append("-nocache")    
             
             self.command.append("%s" % (self.player.uri))    
-
-        # 初始化状态.
-        self.state = STARTING_STATE
+            
         print self.command
-        
-        # self.command.append(path)
+        # 链接管道.
         self.mp_id = subprocess.Popen(self.command, 
                                       stdin = subprocess.PIPE,
                                       stdout = subprocess.PIPE,
@@ -530,27 +526,27 @@ class LDMP(gobject.GObject):
     '''字幕控制''' # s123456
     def sub_add(self, sub_file):
         '''Load subtitle'''
-        if self.state == STARTING_STATE: # STARTING_STATE
+        if self.player.state == STARTING_STATE: # STARTING_STATE
             self.cmd("sub_load '%s'\n" % (sub_file))
             
     def sub_select(self, index, drag_sub=True):        
-        if self.state == STARTING_STATE: # STARTING_STATE
+        if self.player.state == STARTING_STATE: # STARTING_STATE
             self.cmd('sub_select %s\n' % str(index))
             if drag_sub:
                 for sub_num in range(0, self.sub_sum):
                     self.sub_del(sub_num)
 
     def sub_clear(self, end_index): # clear all subtitl file.
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             for index in range(0, end_index):
                 self.sub_del(index)
                 
     def sub_del(self, index):        
-        if self.state == STARTING_STATE: # STARTING_STATE
+        if self.player.state == STARTING_STATE: # STARTING_STATE
             self.cmd('sub_remove %s\n' % index)
                         
     def sub_stop(self):        
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd("sub_select -1\n")
             
     # subtitle alignment. # 0 top 1 center 2 bottom  
@@ -564,7 +560,7 @@ class LDMP(gobject.GObject):
         self.sub_alignment(2)
         
     def sub_alignment(self, alignment_state):
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd("sub_alignment %s\n"%(alignment_state))
 
     # subtitle delay(+/-[abs]).
@@ -575,7 +571,7 @@ class LDMP(gobject.GObject):
         self.sub_delay(-0.1)
     
     def sub_delay(self, value):                    
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd("sub_delay %s\n" % (value))
         
     # subtitle log.
@@ -607,7 +603,7 @@ class LDMP(gobject.GObject):
         self.sub_scale(self.subtitle_scale_value)
     
     def sub_scale(self, value): # value -> %f
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd("sub_scale %s 1\n" % (value));
             
     '''声音控制''' # v123456
@@ -616,7 +612,7 @@ class LDMP(gobject.GObject):
         self.volume = volume_num
         self.volume = min(self.volume, 100)
         
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('volume +%s 1\n' % str(self.volume))
         
     def decvolume(self, volume_num):
@@ -624,7 +620,7 @@ class LDMP(gobject.GObject):
         self.volume = volume_num
         self.volume = max(self.volume, 0)
         
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('volume -%s 1\n' % str(self.volume))
             
     def setvolume(self, volume_num):
@@ -632,26 +628,26 @@ class LDMP(gobject.GObject):
         self.volume = volume_num
         self.volume = max(min(self.volume, 100), 0)
         
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('volume %s 1\n' % str(self.volume))
             
     def leftchannel(self):
         '''The left channel'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('af channels=2:2:0:0:0:0\n')
-            self.channel_state = CHANNEL_LEFT_STATE #1
+            self.player.channel_state = CHANNEL_LEFT_STATE #1
     
     def rightchannel(self):
         '''The right channel'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('af channels=2:2:0:1:1:1\n')             
-            self.channel_state = CHANNEL_RIGHT_STATE #2
+            self.player.channel_state = CHANNEL_RIGHT_STATE #2
             
     def normalchannel(self):
         '''Normal channel'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('af channels=2:2:0:0:1:1\n')
-            self.channel_state = CHANNEL_NORMAL_STATE #0
+            self.player.channel_state = CHANNEL_NORMAL_STATE #0
             
     def offmute(self): 
         self.volumebool = False
@@ -673,50 +669,50 @@ class LDMP(gobject.GObject):
     # brightness.
     def addbri(self, bri_num):
         '''Add brightness'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('brightness +%s\n' % (bri_num))
     
     def decbri(self, bri_num):
         '''Decrease brightness'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('brightness -%s\n' % (bri_num))
     
     # saturation.
     def addsat(self, sat_num):
         '''Add saturation'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('saturation +%s\n' % (sat_num))
             
     def decsat(self, sat_num):
         '''Decrease saturation'''        
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('saturation -%s\n' % (sat_num))
     
     # contrast. 
     def addcon(self, con_num):
         '''Add contrast'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('contrast +%s\n' % (con_num))    
             
     def deccon(self, con_num):
         '''Decrease contrast'''    
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('contrast -%s\n' % (con_num))
     
     # hue.
     def addhue(self, hue_num):
         '''Add hue'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('hue +%s\n' % (hue_num))        
     def dechue(self, hue_num):
         '''Decrease hue'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('hue -%s\n' % (hue_num))
         
     '''dvd控制''' #dvd123456
     # cdrom [dvd, vcd, cd].        
     def dvd_mouse_pos(self, x, y):        
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('set_mouse_pos %d %d\n' % (int(x), int(y)))
         
     def dvd_up(self):
@@ -741,7 +737,7 @@ class LDMP(gobject.GObject):
         self.cmd("dvdnav prev\n")
         
     def dvd_mouse(self):    
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('dvdnav mouse\n')
         
     def switch_angle(self, value):    
@@ -762,25 +758,25 @@ class LDMP(gobject.GObject):
     '''播放器控制[快进，倒退，暂停]'''    
     def seek(self, seek_num):        
         '''Set rate of progress'''
-        if self.state == STARTING_STATE:
+        if self.player.state == STARTING_STATE:
             self.cmd('seek %d 2\n' % (seek_num))               
             
     def fseek(self, seek_num):
         '''Fast forward'''
-        if self.state == STARTING_STATE or self.state == PAUSE_STATE:
+        if self.player.state == STARTING_STATE or self.player.state == PAUSE_STATE:
             self.cmd('seek +%d\n' % (seek_num))   
             
     def bseek(self, seek_num):
         '''backward'''
-        if self.state == STARTING_STATE or self.state == PAUSE_STATE:
+        if self.player.state == STARTING_STATE or self.player.state == PAUSE_STATE:
             self.cmd('seek -%d\n' % (seek_num))
             
     def pause(self, pause_dvd=False):
-        if (self.state == STARTING_STATE or self.state == PAUSE_STATE):
-            if self.state == PAUSE_STATE:
-                self.state = STARTING_STATE
+        if (self.player.state == STARTING_STATE or self.player.state == PAUSE_STATE):
+            if self.player.state == PAUSE_STATE:
+                self.player.state = STARTING_STATE
             else:    
-                self.state = PAUSE_STATE
+                self.player.state = PAUSE_STATE
             self.cmd('pause \n')
         
     '''截图'''
@@ -1076,7 +1072,7 @@ class LDMP(gobject.GObject):
             print "player_thread_complete:", "断开管道!!"
         try:
             # modify state.
-            self.state = STOPING_STATE
+            self.player.state = STOPING_STATE
             # close fd.
             self.mplayer_in.close()
             self.mplayer_out.close()
@@ -1247,6 +1243,8 @@ if __name__ == "__main__":
     #
     mp = LDMP(get_window_xid(screen))
     mp.player.uri = "file:///home/long/Desktop/test.rmvb"
+    mp.player.uri = "http://f.youku.com/player/getFlvPath/sid/00_00/st/flv/fileid/030002010050D29B0C1EB704E9D2A70A597BC9-661F-04B6-2574-7696D26555A6?K=25078da9c15b9aeb261cbce1"
+    mp.player.type = TYPE_NETWORK
     mp.play()
     # mp.play("../../../123.mp3")
     mp.connect("get-time-pos", get_time_pos_test)    
