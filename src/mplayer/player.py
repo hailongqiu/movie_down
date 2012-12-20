@@ -22,6 +22,7 @@
 
 from timer import Timer
 import gobject
+import urlparse
 import subprocess        
 import fcntl
 import gtk
@@ -35,37 +36,14 @@ DEBUG = 0
 TYPE_FILE, TYPE_CD, TYPE_DVD, TYPE_VCD, TYPE_NETWORK= range(0, 5)
 TYPE_DVB, TYPE_TV, TYPE_ = range(5, 8)
 
-############################################################################
-###  保存获取的信息
-class Info(object):
-    def __init__(self):
-        self.file_name = "" # 文件名
-        self.type = None # 文件类型.
-        # 分辨率.
-        self.width = 0 # 宽
-        self.height = 0 # 高
-        # 总长度.
-        self.length = 0 # 媒体时长
-        # 视频.
-        self.video_format = None # 编码格式
-        self.video_bitrate = None # 视频码率  
-        self.video_fps = None # 视频帧率
-        # 音频.
-        self.audio_foramt = None # 编码格式.
-        self.audio_bitrate = None # 音频码率
-        self.audio_nch = None # 声道数.
-        self.audio_rate = None # 采样数.
-        # 
-        self.subtitle_source = None
-        self.subtitle_is_file = None
-        #
-        self.title_is_menu = False
-        #
-        self.subtitle = []
-        
+
+
 class Player(object):        
     def __init__(self):
         self.uri = None
+        self.length = 0
+        self.cache_size = 0
+        self.force_cache = 0
         self.state = STARTING_STATE
         self.profile = None
         self.vo = None
@@ -115,6 +93,14 @@ class Player(object):
         self.extra_opts = None
         #
         self.type = TYPE_FILE
+        self.media_device = 0
+        self.tv_device = None
+        self.tv_driver = None
+        self.tv_input = None
+        self.tv_width = 0
+        self.tv_height = 0
+        self.tv_fps = 0
+        self.title_is_menu = False
         
 ####################################################################        
 ### Mplayer后端控制.
@@ -133,11 +119,10 @@ class LDMP(gobject.GObject):
     def __init__(self, xid):
         gobject.GObject.__init__(self)        
         # init values.
-        self.player = Player()
-        self.init_values(xid)
-                
-    def init_values(self, xid):    
         self.xid = xid
+        self.player = Player()
+        
+    def play(self):        
         self.channel_state = CHANNEL_NORMAL_STATE
         self.state = STOPING_STATE
         self.uri = ""
@@ -145,8 +130,7 @@ class LDMP(gobject.GObject):
         self.has_chapters = False
         self.video_present = False
         self.position = 0.0
-        self.cache_percent = -1.0
-        self.title_is_menu = False
+        self.cache_percent = -1.0        
         self.enable_divx = True
         self.disable_xvmc = False
         self.retry_on_full_cache = False
@@ -154,8 +138,13 @@ class LDMP(gobject.GObject):
         self.audio_track = ''
         self.playback_error = 0;
         #
-        self.type = TYPE_FILE
         ###########################################################
+        filename = ""
+        if self.player.uri:
+            filename = urlparse.urlparse(self.player.uri).path
+            if filename:
+                self.player.type = TYPE_FILE
+                
         codecs_vdpau = None
         codecs_crystalhd = None
         
@@ -248,9 +237,9 @@ class LDMP(gobject.GObject):
         if self.player.hardware_ac3:        
             self.command.append("-afm")
             self.command.append("hwac3,")
-        # else:    
-        #     self.command.append("-af-add")
-        #     self.command.append("export=%s:512" % (self.player.af_export_filename))
+        else:    
+            self.command.append("-af-add")
+            self.command.append("export=%s:512" % (self.player.af_export_filename))
         # 添加初始化设置.        
         self.command.append("-quiet")    
         self.command.append("-slave")    
@@ -409,38 +398,67 @@ class LDMP(gobject.GObject):
                 
         ############## 判断播放类型        
         if self.player.type == TYPE_FILE:
-            pass
+            if filename:
+                if self.player.force_cache and self.player.cache_size >= 32:
+                    self.command.append("-cache")
+                    self.command.append("%d" % (self.player.cache_size))
+                self.command.append(str(filename))    
         elif self.player.type == TYPE_CD:
-            pass
-        elif self.player.type == TYPE_DVD:
-            pass
-        elif self.player.type == TYPE_NETWORK:
-            pass
+            self.command.append("-cache")
+            self.command.append("%d" % (self.cache_size))
+            self.command.append("%s" % (self.uri))
+            if self.player.media_device:
+                self.command.append("-dvd-device")
+                self.command.append("%s" % (self.media_device))
+        elif self.player.type == TYPE_DVD: # DVD播放.
+            self.command.append("-mouse-movements")
+            self.command.append("-nocache")
+            self.command.append("dvdnav://")
+            if self.player.media_device:
+                self.command.append("-dvd-device")
+                self.command.append("%s" % (self.player.media_device))
+        elif self.player.type == TYPE_VCD: # VCD播放.    
+            self.command.append("-nocache")
+            self.command.append("%s" % (self.player.uri))
+            if self.player.media_device:
+                self.command.append("-dvd-device")
+                self.command.append("%s" % (self.player.media_device))
+        elif self.player.type == TYPE_NETWORK: # 网络媒体播放.
+            if self.player.uri.startswith("apple.com"):
+                self.command.append("-user-agent")
+                self.command.append("QuickTime/7.6.9")
+            if self.player.cache_size >= 32:
+                self.command.append("-cache")
+                self.command.append("%d" % (self.player.cache_size))
+            self.command.append("%s" % (self.player.uri))
         elif self.player.type == TYPE_DVB and self.player.type == TYPE_TV:
-            pass
+            if self.player.tv_device:
+                self.command.append("-tv:device")
+                self.command.append("%s" % (self.player.tv_device))
+            if self.player.tv_driver:    
+                self.command.append("-tv:driver")
+                self.command.append("%s" % (self.player.tv_driver))
+            if self.player.tv_input:
+                self.command.append("-tv:input")
+                self.command.append("%s" % (self.player.tv_input))
+            if self.player.tv_width > 0:
+                self.command.append("-tv:width")
+                self.command.append("%d" % (self.tv_width))
+            if self.player.tv_height > 0:
+                self.command.append("-tv:height")
+                self.command.append("%d" % (self.tv_height))
+            if self.player.tv_fps > 0:    
+                self.command.append("-tv:fps")
+                self.command.append("%d" % (self.tv_fps))
+            self.command.append("-nocache")    
+            
+            self.command.append("%s" % (self.player.uri))    
 
-    
-    def play(self, path):
-        # 保存文件路径.
-        self.path = path
         # 初始化状态.
         self.state = STARTING_STATE
-        # 获取播放文件信息.
-        self.file_info = Info()
         print self.command
-        #
-        # self.command = ['mplayer',
-        #            '-nokeepaspect',
-        #            '-osdlevel',
-        #            '0',
-        #            '-double',
-        #            '-slave',
-        #            '-quiet']            
         
-        self.command.append(path)
-        # self.command.append('-wid')
-        # self.command.append('%s' % (str(self.xid)))
-        print self.command
+        # self.command.append(path)
         self.mp_id = subprocess.Popen(self.command, 
                                       stdin = subprocess.PIPE,
                                       stdout = subprocess.PIPE,
@@ -473,16 +491,8 @@ class LDMP(gobject.GObject):
         self.get_time_length()
         # 测试输出.
         if DEBUG:
-            print self.file_info.file_name
-            print length_to_time(int(self.file_info.length))
-            print self.file_info.video_format
-            print self.file_info.video_bitrate
-            print self.file_info.video_fps
-            print self.file_info.audio_foramt
-            print self.file_info.audio_nch
-            print self.file_info.audio_bitrate
-            print self.file_info.audio_rate
-                        
+            print ""
+            
     def thread_query(self, tick):
         self.get_time_pos()
         
@@ -826,7 +836,7 @@ class LDMP(gobject.GObject):
                 pos =  float(buffer.replace("ANS_TIME_POSITION=", "").split("\n")[0])
                 if pos >= 0:
                     self.emit("get-time-pos", pos)
-                if pos > self.file_info.length: # 结束播放.
+                if pos > self.player.length: # 结束播放.
                     self.quit()
             #   
             if buffer.startswith("ID_START_TIME"):
@@ -837,7 +847,7 @@ class LDMP(gobject.GObject):
             #    
             if buffer.startswith("ANS_LENGTH"):
                 length = float(buffer.replace("ANS_LENGTH=", "").split("\n")[0])
-                self.file_info.length = length
+                self.player.length = length
             #    
             if buffer.startswith("ID_AUDIO_TRACK"):
                 print buffer.replace("ID_AUDIO_TRACK=", "")
@@ -846,15 +856,15 @@ class LDMP(gobject.GObject):
                 print buffer.replace("ANS_switch_audio=", "")
                
             if buffer.startswith("ANS_sub_source"):    
-                self.file_info.subtitle_source = buffer.replace("ANS_sub_source")
-                if self.file_info.subtitle_source == 0:
-                    self.file_info.subtitle_is_file = True
+                # self.file_info.subtitle_source = buffer.replace("ANS_sub_source")
+                # if self.file_info.subtitle_source == 0:
+                    # self.file_info.subtitle_is_file = True
                     self.cmd("get_property sub_file\n")
-                elif self.file_info.subtitle_source == 1:    
-                    self.file_info.subtitle_is_file = False
+                # elif self.file_info.subtitle_source == 1:    
+                    # self.file_info.subtitle_is_file = False
                     self.cmd("get_property sub_vob\n")
-                elif self.file_info.subtitle_source == 2:
-                    self.file_info.subtitle_is_filew = False
+                # elif self.file_info.subtitle_source == 2:
+                    # self.file_info.subtitle_is_filew = False
                     self.cmd("get_property sub_demux\n")
                                         
             if buffer.startswith("ANS_sub_file"):
@@ -864,11 +874,11 @@ class LDMP(gobject.GObject):
                 print buffer.replace("ANS_sub_demux", "")
                 
             if buffer.startswith("DVDNAV_TITLE_IS_MENU"):
-                self.file_info.title_is_menu = True
+                self.player.title_is_menu = True
                 self.get_time_length()
                 
             if buffer.startswith("DVDNAV_TITLE_IS_MOVIE"): 
-                self.file_info.title_is_menu = False
+                # self.file_info.title_is_menu = False
                 self.get_time_length()
                 
             if buffer.startswith("ID_SUBTITLE_ID="): 
@@ -877,7 +887,7 @@ class LDMP(gobject.GObject):
                 lang = buffer.startswith("Unknown")
                 name =buffer.startswith("Unknown")
                 subtitle_tuple = (name, lang, id)
-                self.file_info.subtitle.append(subtitle_tuple)
+                # self.file_info.subtitle.append(subtitle_tuple)
                 
                 
             if buffer.startswith("ID_SID_"):
@@ -1015,10 +1025,10 @@ class LDMP(gobject.GObject):
                 # 
                 if (buffer.find("<") == -1 
                     and buffer.find(">") == -1 
-                    and self.file_info.type == TYPE_FILE):
+                    and self.player.type == TYPE_FILE):
                     error_msg = ""
                 # mms error.
-                if buffer.find("mms://") != -1 and self.file_info.type == TYPE_NETWORK:
+                if buffer.find("mms://") != -1 and self.player.type == TYPE_NETWORK:
                     pass
                    
         if buffer.find("No stream found to handle url mmshttp://") != -1:
@@ -1173,7 +1183,7 @@ if __name__ == "__main__":
         print "length:", length, "time:", time
         
     def modify_ascept(widget, event):
-        if mp.state == STARTING_STATE:
+        if mp.player.state == STARTING_STATE:
             set_ascept_function(screen_frame, 4.0/3.0)
         
     def pause_clicked(widget):    
@@ -1236,7 +1246,8 @@ if __name__ == "__main__":
     vbox.show_all()
     #
     mp = LDMP(get_window_xid(screen))
-    mp.play("../../../test.rmvb")
+    mp.player.uri = "file:///home/long/Desktop/test.rmvb"
+    mp.play()
     # mp.play("../../../123.mp3")
     mp.connect("get-time-pos", get_time_pos_test)    
     mp.connect("get-time-length", get_time_length_test)    
