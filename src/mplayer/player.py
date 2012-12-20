@@ -32,7 +32,9 @@ DEBUG = 0
 (STOPING_STATE, PAUSE_STATE, STARTING_STATE)= range(0, 3)
 (CHANNEL_NORMAL_STATE, CHANNEL_LEFT_STATE, CHANNEL_RIGHT_STATE ) = range(0, 3)
 
-TYPE_NETWORK, TYPE_FILE = range(0, 2)
+TYPE_FILE, TYPE_CD, TYPE_DVD, TYPE_VCD, TYPE_NETWORK= range(0, 5)
+TYPE_DVB, TYPE_TV, TYPE_ = range(5, 8)
+
 ############################################################################
 ###  保存获取的信息
 class Info(object):
@@ -61,6 +63,56 @@ class Info(object):
         #
         self.subtitle = []
         
+class Player(object):        
+    def __init__(self):
+        self.profile = None
+        self.vo = None
+        self.deinterlace = None
+        self.enable_hardware_codecs = None
+        self.enable_divx = None
+        self.disable_xvmc = None
+        self.post_processing_level = 0
+        #
+        self.ao = None
+        self.alsa_mixer = None
+        self.audio_channels = 0
+        self.hardware_ac3 = None
+        self.af_export_filename = 0
+        self.softvol = None
+        #
+        self.volume = 0
+        self.volume_gain = 0
+        #
+        self.start_time = 0
+        self.run_time = 0
+        self.frame_drop = None
+        self.osdlevel = 0
+        self.audio_delay = 0.0
+        self.subtitle_delay = 0.0
+        self.subtitle_position = 0
+        #
+        self.brightness = 0
+        self.contrast = 0
+        self.hue = 0
+        self.saturation = 0
+        self.alang = None
+        self.slang = None
+        
+        self.audio_track_file = None
+        self.subtitle_file = None
+        self.enable_advanced_subtitles = None
+        self.subtitle_margin = 0
+        self.enable_embedded_fonts = None
+        self.subtitle_font = None
+        self.subtitle_outline = None
+        self.subtitle_shadow = None
+        self.subtitle_scale = 0.0
+        self.subtitle_color = None
+        self.subtitle_codepage = None
+        self.extra_opts = None
+        #
+        self.type = None
+        
 ####################################################################        
 ### Mplayer后端控制.
 class LDMP(gobject.GObject):
@@ -75,39 +127,317 @@ class LDMP(gobject.GObject):
         "error-msg":(gobject.SIGNAL_RUN_LAST,
                             gobject.TYPE_NONE,(gobject.TYPE_STRING,)),        
         }
-    def __init__(self, xid=None):
+    def __init__(self, xid):
         gobject.GObject.__init__(self)        
         # init values.
+        self.player = Player()
         self.init_values(xid)
-        
+                
     def init_values(self, xid):    
-        self.info = None
         self.xid = xid
         self.channel_state = CHANNEL_NORMAL_STATE
         self.state = STOPING_STATE
-        self.path = None
+        self.uri = ""
+        self.seekable = False
+        self.has_chapters = False
+        self.video_present = False
+        self.position = 0.0
+        self.cache_percent = -1.0
+        self.title_is_menu = False
+        self.enable_divx = True
+        self.disable_xvmc = False
+        self.retry_on_full_cache = False
+        self.subtitle = []        
+        self.audio_track = ''
+        self.playback_error = 0;
+        #
+        self.type = TYPE_FILE
+        ###########################################################
+        codecs_vdpau = None
+        codecs_crystalhd = None
         
-    def play(self, path):        
+        self.command = ["mplayer"]
+        if self.player.profile:
+            self.command.append("-profile")
+            self.command.append(self.player.profile)
+            
+        if self.player.vo:
+            self.command.append("-vo")
+            if self.player.vo.startswith('vdpau'):
+                #
+                if self.player.deinterlace:
+                    self.command.append("vdpau:deint=2,%s,gl,x11" % (self.player.vo))
+                else:
+                    self.command.append("%s,gl,x11" % (self.player.vo))
+                #
+                if self.player.enable_hardware_codecs:
+                    if self.player.enable_divx:
+                        codecs_vdpau = "ffmpeg12vdpau,ffh264vdpau,ffwmv3vdpau,ffvc1vdpau,ffodivxvdpau,"
+                    else:
+                        codecs_vdpau = "ffmpeg12vdpau,ffh264vdpau,ffwmv3vdpau,ffvc1vdpau,"
+            elif self.player.vo.startswith("vaapi"): 
+                self.command.append(self.player.vo)
+                self.command.append("-va")
+                self.command.append("vaapi")
+            elif self.player.vo.startswith("xvmc"):
+                if self.player.disable_xvmc:
+                    self.command.append("xv,")
+                else:    
+                    self.command.append("%s,xv," % (self.player.vo))
+            else:            
+                if self.player.vo.startswith("gl"):
+                    self.command("gl_nosw")
+                elif self.player.vo.startswith("gl2"):
+                    self.command.append("gl_nosw")
+                else:    
+                    self.command.append("%s" % (self.player.vo))
+                
+                if self.player.deinterlace:
+                    self.command.append("-vf-pre")
+                    self.command.append("yadif,softskip,scale")
+                    
+                if self.player.post_processing_level > 0:
+                    self.command.append("-vf-add")
+                    self.command.append("pp=ac/tn:a")
+                    self.command.append("-autoq")
+                    self.command.append("%d" % (self.player.post_processing_level))
+                    
+                self.command.append("-vf-add")
+                self.command.append("screenshot")
+                
+                
+        if self.player.enable_hardware_codecs:
+            codecs_crystalhd = "ffmpeg2crystalhd,ffdivxcrystalhd,ffwmv3crystalhd,ffvc1crystalhd,ffh264crystalhd,ffodivxcrystalhd,"
+            
+        codecs = None    
+        if codecs_vdpau and codecs_crystalhd:    
+            codecs = codecs_vdpau + codecs_crystalhd
+        elif codecs_vdpau:    
+            codecs = codecs_vdpau
+        elif codecs_crystalhd:    
+            codecs = codecs_crystalhd
+            
+        if codecs:    
+            self.command.append("-vc")
+            self.command.append("%s" % (codecs))
+            
+        if self.player.ao:    
+            self.command.append("-ao")
+            self.command.append("%s" % (self.player.ao))
+            
+            if self.player.alsa_mixer:
+                self.command.append("-mixer-channel")
+                self.command.append("%s" % (self.player.alsa_mixer))
+                
+        # 初始化声道.    
+        self.command.append("-channels")            
+        # if self.player.audio_channels:
+        case = self.player.audio_channels
+        if case == 1:
+            self.command.append("4")
+        elif case == 2:    
+            self.command.append("6")
+        elif case == 3:    
+            self.command.append("8")
+        else:    
+            self.command.append("2")
+                    
+        if self.player.hardware_ac3:        
+            self.command.append("-afm")
+            self.command.append("hwac3,")
+        # else:    
+        #     self.command.append("-af-add")
+        #     self.command.append("export=%s:512" % (self.player.af_export_filename))
+        # 添加初始化设置.        
+        self.command.append("-quiet")    
+        self.command.append("-slave")    
+        self.command.append("-noidle")    
+        self.command.append("-noconsolecontrols")    
+        self.command.append("-nostop-xscreensaver")    
+        self.command.append("-identify")    
+        
+        if self.player.softvol:
+            if self.player.volume != 0:
+                self.command.append("-volume")
+                self.command.append("%i" % (self.player.volume))
+            if self.player.volume_gain != 0:
+                self.command.append("-af-add")
+                self.command.append("volume=%lf:0" % (self.playervolume_gain))
+            self.command.append("-softvol")
+            
+        if self.player.start_time > 0:
+            self.command.append("-ss")
+            self.command.append("%d" % (self.player.start_time))
+            
+        if self.player.run_time > 0:    
+            self.command.append("-endpos")
+            self.command.append("%d", self.player.run_time)
+            
+        # if self.player.frame_drop:    
+        #     self.command.append("-framedrop")
+            
+        # self.command.append("-msglevel")    
+        # self.command.append("all=5")    
+        
+        # self.command.append("-osdlevel")
+        # self.command.append("%i" % (self.player.osdlevel))
+        
+        # self.command.append("-delay")
+        # self.command.append("%f" % (self.player.audio_delay))
+        
+        # self.command.append("-subdelay")
+        # self.command.append("%f" % (self.player.subtitle_delay))
+        
+        # self.command.append("-subpos")
+        # self.command.append("%d" % (self.player.subtitle_position))
+                        
+        self.command.append("-wid")
+        self.command.append(str(self.xid))
+        
+        # self.command.append("-brightness")
+        # self.command.append(self.player.brightness)
+        # self.command.append("-contrast")
+        # self.command.append(self.player.contrast)
+        # self.command.append("-hue")
+        # self.command.append(self.player.hue)
+        # self.command.append("-saturation")                   
+        # self.command.append(self.player.saturation)
+        
+        # if self.player.alang:
+        #     self.command.append("-alang")
+        #     self.command.append("%s" % (self.player.alang))
+            
+        # if self.player.slang:    
+        #     self.command.append("-slang")
+        #     self.command.append("%s" % (self.player.slang))
+            
+        self.command.append("-nomsgcolor")    
+        self.command.append("-nomsgmodule")
+            
+        self.command.append("-nokeepaspect")
+        
+        if (self.player.audio_track_file 
+            and len(self.player.audio_track_file) > 0):
+            self.command.append("-audiofile")
+            self.command.append("%s" % (self.player.audio_track_file))
+            
+        if (self.player.subtitle_file
+            and len(self.player.subtitle_file) > 0):
+            self.command.append("-sub")
+            self.command.append("%s" % (self.player.subtitle_file))
+            
+        if self.player.enable_advanced_subtitles:
+            self.command.append("-ass")
+            if self.player.subtitle_margin > 0:
+                self.command.append("-ass-bottom-margin")
+                self.command.append("%d"%(self.player.subtitle_margin))
+                self.command.append("-ass-use-margins")
+                
+            if self.player.enable_embedded_fonts:                    
+                self.command.append("-embeddedfonts")
+            else:    
+                self.command.append("-noembeddedfonts")
+                #
+                if (self.player.subtitle_font
+                    and len(self.player.subtitle_font) > 0):                    
+                    fontname = self.player.subtitle_font
+                    size = fontname.find(" ")
+                    if size:
+                        size[0] = '\0'
+                    size +=  " Bold" 
+                    if size:
+                        size[0] = '\0'
+                    size += " Italic"    
+                    if size:    
+                        size[0] = '\0'
+                        
+                    if self.player.subtitle_font.startswith("Italic"):
+                        italic = ",Italic=1" 
+                    else:    
+                        italic = ",Italic=0"
+                    if self.player.subtitle_font.startswith("Bold"):
+                        bold = ",Bold=1"
+                    else:                            
+                        bold = ",Bold=0"
+                    if self.player.subtitle_outline:
+                        outline = ",Outline=1" 
+                    else:
+                        outline = ",Outline=0"
+                    if self.player.subtitle_shadow:    
+                        shadow = ",Shadow=2" 
+                    else:
+                        shadow = ",Shadow=0"    
+                    font_str = "FontName=" + fontname + italic + bold + outline + shadow
+                    self.command.append("-ass-force-style")
+                    self.command.append(font_str)
+                    
+                    
+                    self.command.append("-ass-font-scale")
+                    self.command.append("%f" % self.player.subtitle_scale);
+                    
+                    if (self.player.subtitle_color and len(self.player.subtitle_color) > 0):
+                        self.command.append("-ass-color");
+                        self.command.append("%s" % self.player.subtitle_color);
+        # else:        
+        #      if self.player.subtitle_scale:
+        #          self.command.append("-subfont-text-scale")
+        #          self.command.append("%d" % (self.player.subtitle_scale * 3))
+                        
+        #      if (self.player.subtitle_font 
+        #          and len(self.player.subtitle_font)):
+        #          fontname = self.player.subtitle_font
+        #          size = fontname.find(" ")
+        #          if size:
+        #              size[0] = '\0'
+        #              self.command.append("-subfont")    
+        #              self.command.append("%s" % (fontname))    
+                        
+        if (self.player.subtitle_codepage 
+            and len(self.player.subtitle_codepage)):
+            self.command.append("-subcp")
+            
+        if self.player.extra_opts:
+            opts = self.player.extra_opts
+            i = 0
+            while opts[i]:
+                self.command.append(opts[i])
+                i += 1
+                
+        ############## 判断播放类型        
+        if self.player.type == TYPE_FILE:
+            pass
+        elif self.player.type == TYPE_CD:
+            pass
+        elif self.player.type == TYPE_DVD:
+            pass
+        elif self.player.type == TYPE_NETWORK:
+            pass
+        elif self.player.type == TYPE_DVB and self.player.type == TYPE_TV:
+            pass
+
+    
+    def play(self, path):
         # 保存文件路径.
         self.path = path
         # 初始化状态.
         self.state = STARTING_STATE
         # 获取播放文件信息.
         self.file_info = Info()
+        print self.command
         #
-        command = ['mplayer',
-                   '-nokeepaspect',
-                   '-osdlevel',
-                   '0',
-                   '-double',
-                   '-slave',
-                   '-quiet']            
+        # self.command = ['mplayer',
+        #            '-nokeepaspect',
+        #            '-osdlevel',
+        #            '0',
+        #            '-double',
+        #            '-slave',
+        #            '-quiet']            
         
-        command.append(path)
-        command.append('-wid')
-        command.append('%s' % (str(self.xid)))
-
-        self.mp_id = subprocess.Popen(command, 
+        self.command.append(path)
+        # self.command.append('-wid')
+        # self.command.append('%s' % (str(self.xid)))
+        print self.command
+        self.mp_id = subprocess.Popen(self.command, 
                                       stdin = subprocess.PIPE,
                                       stdout = subprocess.PIPE,
                                       stderr = subprocess.PIPE,
