@@ -424,10 +424,10 @@ class LDMP(gobject.GObject):
             if self.player.uri.startswith("apple.com"):
                 self.command.append("-user-agent")
                 self.command.append("QuickTime/7.6.9")
-            if self.player.cache_size >= 32:
+            elif self.player.cache_size >= 32:
                 self.command.append("-cache")
                 self.command.append("%d" % (self.player.cache_size))
-            if self.player.uri.startswith("http://"):    
+            else:    
                 self.command.append("-nocache")    
             self.command.append("%s" % (self.player.uri))
         elif self.player.type == TYPE_DVB and self.player.type == TYPE_TV:
