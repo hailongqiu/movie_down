@@ -1,0 +1,32 @@
+星期一:
+    测试多个进程间通信问题,mmpa,dbus,socket,管道.
+    给托盘程序添加进程间通信.
+    给托盘添加gio文件监控,然后接收其它程序发来的信息.
+    查看gtkstatusicon源码,最后得知,夏斌的DOCK管理了托盘协议,
+    无论我如何变化,最后也缩小托盘内容.
+    学习C语言的gobject基础.
+    
+星期二:
+    查看alltray源码,进行编译和改写,查出核心函数.
+    编写新的trayicon.
+    https://github.com/darthlukan/pypanel/blob/master/pypanel
+    
+星期三:
+    新托盘在新系统测试,高宽被压,和夏斌商议,夏斌改进.
+    新托盘dock挂了,托盘也挂.
+    新托盘添加motion,release事件.
+
+gtk_tray_icon_update_manager_window
+
+
+开始进驻时:
+1.托盘图标程序发送一条客户消息事件给管理者选择区拥有者窗口，就像是在“操作码消息”段描述的那样
+2.SYSTEM_TRAY_REQUEST_DOCK操作码
+3.数据字段xclient.data.l[2]应该包含将要进驻的托盘图标的X窗口ID
+
+
+ gdk_window_get_position (menu->toplevel->window, &window_x, &window_y);   
+2773                                                                                 
+2774       if (x_root >= window_x && x_root < window_x + widget->allocation.width && 
+2775           y_root >= window_y && y_root < window_y + widget->allocation.height)  
+2776         return TRUE;
